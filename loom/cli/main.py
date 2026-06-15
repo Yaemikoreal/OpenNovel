@@ -75,7 +75,7 @@ def init(
             char_template,
             "# 角色背景\n\n在此自由书写角色的背景故事...",
         )
-        rprint(f"  [green]✓[/green] 创建角色模板: characters/char_001.md")
+        rprint("  [green]✓[/green] 创建角色模板: characters/char_001.md")
 
     # 生成设定模板
     canon_template = {
@@ -89,7 +89,7 @@ def init(
             canon_template,
             "# 世界观设定\n\n在此书写不可违反的世界观规则...",
         )
-        rprint(f"  [green]✓[/green] 创建设定模板: canon/world_rules.md")
+        rprint("  [green]✓[/green] 创建设定模板: canon/world_rules.md")
 
     # 生成章节模板
     chapter_template = {
@@ -105,7 +105,7 @@ def init(
             chapter_template,
             "# 第一章\n\n",
         )
-        rprint(f"  [green]✓[/green] 创建章节模板: draft/ch_001.md")
+        rprint("  [green]✓[/green] 创建章节模板: draft/ch_001.md")
 
     # 生成 loom.yaml 配置
     import yaml
@@ -120,7 +120,7 @@ def init(
     if not config_path.exists():
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
-        rprint(f"  [green]✓[/green] 创建配置文件: loom.yaml")
+        rprint("  [green]✓[/green] 创建配置文件: loom.yaml")
 
     rprint("[bold green]项目初始化完成！[/bold green]")
     rprint("使用 [bold]loom write[/bold] 开始创作，[bold]loom commit[/bold] 提取状态。")
@@ -153,7 +153,6 @@ def diff(
     path: str = typer.Argument(".", help="项目路径"),
 ) -> None:
     """检查正文与 Shadow 状态的一致性，暴露逻辑漏洞。"""
-    from pathlib import Path
 
     rprint("[bold cyan]L.O.O.M. diff[/bold cyan] - 一致性校验")
     rprint("[dim]功能开发中...[/dim]")
@@ -164,7 +163,6 @@ def doctor(
     path: str = typer.Argument(".", help="项目路径"),
 ) -> None:
     """诊断世界线健康度（基础检测：孤立角色、时间线倒错）。"""
-    from pathlib import Path
 
     rprint("[bold cyan]L.O.O.M. doctor[/bold cyan] - 世界线诊断")
     rprint("[dim]功能开发中...[/dim]")

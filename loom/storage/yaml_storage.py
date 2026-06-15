@@ -13,7 +13,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import frontmatter
 
@@ -93,9 +93,7 @@ class YAMLStorage:
         post = frontmatter.Post(body, **metadata)
         self._atomic_write(file_path, frontmatter.dumps(post))
 
-    def update_frontmatter(
-        self, file_path: Path, updates: dict[str, Any]
-    ) -> dict[str, Any]:
+    def update_frontmatter(self, file_path: Path, updates: dict[str, Any]) -> dict[str, Any]:
         """仅更新 Markdown 文件的 Frontmatter 区域，保持正文不变。
 
         此方法是 Auditor 写入状态的核心入口，确保正文区不被机器篡改。
@@ -112,9 +110,7 @@ class YAMLStorage:
         self.write_markdown_file(file_path, metadata, body)
         return metadata
 
-    def get_frontmatter_value(
-        self, file_path: Path, key: str
-    ) -> Optional[Any]:
+    def get_frontmatter_value(self, file_path: Path, key: str) -> Any | None:
         """获取 Markdown 文件 Frontmatter 中指定字段的值。
 
         Args:
@@ -149,11 +145,9 @@ class YAMLStorage:
             包含 Frontmatter 和正文的 CharacterFile 对象
         """
         metadata, body = self.read_markdown_file(file_path)
-        return CharacterFile(
-            frontmatter=CharacterFrontmatter(**metadata), body=body
-        )
+        return CharacterFile(frontmatter=CharacterFrontmatter(**metadata), body=body)
 
-    def extract_pov_character_id(self, chapter_path: Path) -> Optional[str]:
+    def extract_pov_character_id(self, chapter_path: Path) -> str | None:
         """从章节文件中提取 POV 角色 ID。
 
         Args:
@@ -203,8 +197,7 @@ class YAMLStorage:
             actual_value = actual.get(key)
             if actual_value != expected_value:
                 raise ConflictError(
-                    f"字段 '{key}' 已被外部修改: "
-                    f"预期={expected_value!r}, 实际={actual_value!r}"
+                    f"字段 '{key}' 已被外部修改: 预期={expected_value!r}, 实际={actual_value!r}"
                 )
         actual.update(updates)
         self.write_markdown_file(file_path, actual, body)

@@ -1,120 +1,306 @@
-# L.O.O.M. (Living Organic Outline Machine) V1.0.1
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/L.O.O.M.-Living%20Organic%20Outline%20Machine-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
+    <img alt="L.O.O.M." src="https://img.shields.io/badge/L.O.O.M.-Living%20Organic%20Outline%20Machine-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
+  </picture>
+</p>
 
-本地优先的长篇小说叙事操作系统。
+<p align="center">
+  <b>本地优先的长篇小说叙事操作系统</b><br>
+  <i>作者只写 Markdown，系统维护世界观的严丝合缝</i>
+</p>
 
-L.O.O.M. 不是"一键生成小说"的玩具，而是作者的"数字织机"与"记忆外脑"。核心目标：让作者只专注于用自然语言创作，由系统在底层维护世界观的严丝合缝。
+<p align="center">
+  <a href="https://github.com/Yaemikoreal/LOOM/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/Yaemikoreal/LOOM?color=8B5CF6&style=flat-square" alt="MIT License">
+  </a>
+  <a href="https://www.python.org/downloads/">
+    <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=ffd343" alt="Python 3.10+">
+  </a>
+  <a href="https://github.com/Yaemikoreal/LOOM/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/Yaemikoreal/LOOM/ci.yml?branch=main&style=flat-square&label=CI" alt="CI">
+  </a>
+  <a href="https://codecov.io/gh/Yaemikoreal/LOOM">
+    <img src="https://img.shields.io/codecov/c/github/Yaemikoreal/LOOM?style=flat-square&token=YOUR_TOKEN" alt="Coverage">
+  </a>
+  <a href="https://github.com/astral-sh/ruff">
+    <img src="https://img.shields.io/badge/code%20style-ruff-261230?style=flat-square" alt="Ruff">
+  </a>
+  <a href="https://github.com/Yaemikoreal/LOOM/blob/main/CODE_OF_CONDUCT.md">
+    <img src="https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa?style=flat-square" alt="Code of Conduct">
+  </a>
+  <a href="https://github.com/Yaemikoreal/LOOM/releases">
+    <img src="https://img.shields.io/github/v/release/Yaemikoreal/LOOM?style=flat-square&color=8B5CF6" alt="Latest Release">
+  </a>
+</p>
 
-## 核心设计原则
+<p align="center">
+  <a href="#-特性">特性</a> •
+  <a href="#-快速开始">快速开始</a> •
+  <a href="#-CLI-命令">CLI 命令</a> •
+  <a href="#-架构">架构</a> •
+  <a href="#-贡献">贡献</a> •
+  <a href="#-许可证">许可证</a>
+</p>
 
-1. **Human-first (人类主导)** — 作者只写纯文本 Markdown，严禁要求填写 YAML 配置
-2. **Memory-as-shadow (记忆如影)** — YAML/SQLite 是 AI 自动提取的影子，不作为输入层
-3. **Zero-Trust AI (零信任输出)** — AI 提取的状态变更必须经过人工 Diff 审阅才可固化，支持一键回滚
-4. **Model Agnostic (模型无关)** — 通过 LiteLLM 总线屏蔽底层模型差异
+---
 
-## 安装
+## 🔍 简介
+
+**L.O.O.M.** 不是"一键生成小说"的玩具——它是写作者的**数字织机**与**记忆外脑**。
+
+> 你写故事，L.O.O.M. 记住故事的每一个细节。
+
+传统写作工具要么过于简单（纯文本编辑器），要么过于复杂（项目管理式写作软件）。L.O.O.M. 走了第三条路：
+
+- **Human Layer**: 你只写纯 Markdown，就像在 Obsidian 或 VSCode 中一样自在
+- **Machine Shadow**: AI 在后台自动提取状态、追踪事件、维护设定一致性
+- **Semantic Layer**: 向量引擎让"我记得某章写过…"成为可搜索的语义记忆
+
+### 为何叫 L.O.O.M.?
+
+"Loom" 意为织布机——正如织工将经纬线交织成布，L.O.O.M. 将你的灵感丝线编织成有机生长的故事。
+
+---
+
+## ✨ 特性
+
+<table>
+<tr>
+<td width="50%">
+
+### 📝 纯 Markdown 创作
+- 用你最喜欢的编辑器写故事
+- YAML Frontmatter 由系统自动管理
+- 零学习成本，零格式污染
+</td>
+<td width="50%">
+
+### 🧠 AI 记忆外脑
+- 自动提取角色/事件/世界观状态
+- 三级权威分级防幻觉
+- 智能上下文组装 + Token 熔断
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🔐 零信任安全
+- AI 只能提议，你才是最终决策者
+- `loom commit` 强制 Diff 审阅
+- 一键回滚恢复任何错误
+</td>
+<td width="50%">
+
+### 🔄 模型无关
+- 通过 LiteLLM 总线连接任何 LLM
+- 支持 OpenAI / Anthropic / DeepSeek / Ollama / 本地模型
+- 自动适配上下文窗口策略
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🌱 有机生长
+- 灵感碎片自动汇入潜意识池
+- 世界在你写作中自然扩展
+- 支持增量快照、因果压强追踪
+</td>
+<td width="50%">
+
+### 📦 纯本地优先
+- 所有数据在本地 SQLite + Markdown
+- 可被 git 追踪、Obsidian 打开
+- 无需注册、无需云账号、零数据泄漏
+</td>
+</tr>
+</table>
+
+---
+
+## ⚡ 快速开始
+
+### 安装
 
 ```bash
-# 克隆项目
-cd E:\Pythonproject\LOOM
+# 推荐：使用 pipx 隔离安装
+pipx install loom-narrative
 
-# 创建虚拟环境
-python -m venv .venv
-.venv\Scripts\activate
+# 或使用 pip
+pip install loom-narrative
 
-# 安装依赖
-pip install -e .
-
-# 开发依赖
+# 从源码安装
+git clone https://github.com/Yaemikoreal/LOOM.git
+cd LOOM
 pip install -e ".[dev]"
 ```
 
-## 使用
+### 五分钟体验
 
 ```bash
-# 初始化小说项目
-loom init ./my-novel
+# 1. 创建新小说项目
+loom init ./my-epic
 
-# 启动交互式写作
-loom write ch_001.md --path ./my-novel
+# 2. 添加角色
+echo "---
+char_001:
+  name: 林夜
+  role: protagonist
+---
+林夜站在废弃的观象台上，风呼啸着穿过断裂的穹顶。" > ./my-epic/characters/char_001.md
 
-# 存入灵感碎片
-loom stash "深渊不收我" --tag 金句 --tag 绝望 --path ./my-novel
+# 3. 开始写作
+loom write ./my-epic/draft/ch_001.md
 
-# 提取状态并审阅
-loom commit ch_001.md --path ./my-novel
+# 4. 存入灵感（可选）
+loom stash "深渊不会主动吞噬你——它只是让你自己跳下去。" --tag 金句 --tag 哲学
 
-# 回滚错误 commit
-loom rollback ch_001_1698765432 --path ./my-novel
-
-# 一致性校验
-loom diff --path ./my-novel
-
-# 世界线诊断
-loom doctor --path ./my-novel
+# 5. 审阅状态变更
+loom commit ./my-epic/draft/ch_001.md
 ```
 
-## 项目结构
+---
+
+## 📟 CLI 命令
+
+| 命令 | 功能 | 状态 |
+|:---|:---|:---|
+| `loom init <path>` | 初始化小说项目目录 | ✅ |
+| `loom write <file>` | 沉浸式 AI 续写循环 | ✅ |
+| `loom stash <text>` | 存入灵感潜意识池 | ✅ |
+| `loom commit <file>` | 5 步审阅流程固化状态 | ✅ |
+| `loom rollback <snapshot>` | 回滚到指定快照 | ✅ |
+| `loom diff <file>` | 正文 / Shadow 一致性校验 | 🚧 建设中 |
+| `loom doctor <path>` | 世界线健康度诊断 | 🚧 建设中 |
+
+详细命令文档：`loom --help` 或查看 [CLAUDE.md](CLAUDE.md)。
+
+---
+
+## 🏗️ 架构
+
+```
+╔══════════════════════════════════╗
+║        Human Layer (创作层)       ║  ← 你只写 Markdown
+╠══════════════════════════════════╣
+║       Machine Shadow (状态层)     ║  ← AI 自动提取
+╠══════════════════════════════════╣
+║      Semantic Layer (语义层)      ║  ← 向量检索记忆
+╚══════════════════════════════════╝
+```
+
+### 三层解耦
+
+| 层级 | 内容 | 技术 |
+|:---|:---|:---|
+| **Human Layer** | `canon/` `characters/` `draft/` 中的纯 Markdown | 任意文本编辑器 |
+| **Machine Shadow** | YAML Frontmatter + SQLite 事件账本 + Snapshots | `python-frontmatter` + `SQLModel` |
+| **Semantic Layer** | LlamaIndex + BGE-M3 向量索引 | `LlamaIndex` + `sentence-transformers` |
+
+### 四条防爆铁律
+
+```
+铁律 1: ID 即锚点     → 全局 Canonical IDs，绑定不绑定名
+铁律 2: 权威分级       → CANON > STATE MEMORY > SUBCONSCIOUS
+铁律 3: 人工审核关口   → AI 只提议，人类决定
+铁律 4: 操作可逆       → 破坏前快照，出错可回滚
+```
+
+### 技术栈
+
+| 组件 | 技术 | 用途 |
+|:---|:---|:---|
+| CLI 框架 | `Typer` + `Rich` | 命令路由、终端富文本 |
+| LLM 总线 | `LiteLLM` + `tenacity` | 统一模型调用、重试容错 |
+| 检索引擎 | `LlamaIndex` | 文档解析、向量索引 |
+| 向量化 | `BGE-M3`（可选） | 本地语义检索 |
+| 数据校验 | `Pydantic V2` + `SQLModel` | 强类型状态校验 |
+| 状态账本 | `SQLite` | 因果事件日志 |
+| 文件解析 | `python-frontmatter` | Markdown/YAML 安全隔离 |
+| Token 控制 | `tiktoken` | 上下文预算熔断 |
+
+---
+
+## 🧪 开发
+
+```bash
+# 克隆
+git clone https://github.com/Yaemikoreal/LOOM.git
+cd LOOM
+
+# 虚拟环境
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+source .venv/bin/activate  # macOS/Linux
+
+# 安装开发依赖
+pip install -e ".[dev]"
+
+# 运行测试
+pytest -v --tb=short
+
+# 带覆盖率
+pytest --cov=loom --cov-report=term-missing
+
+# 代码检查
+ruff check loom/ tests/
+ruff format --check loom/ tests/
+mypy loom/
+```
+
+### 项目结构
 
 ```
 loom/
-├── cli/                     # CLI 命令入口
-│   ├── main.py              # loom 根命令 (Typer)
+├── cli/                     # Typer CLI 命令入口
+│   ├── main.py              # loom 根命令
 │   ├── write.py             # loom write
 │   ├── commit.py            # loom commit & rollback
 │   └── stash.py             # loom stash
 ├── core/                    # 核心引擎
-│   ├── llm.py               # LiteLLM 封装 & tenacity 重试
-│   ├── context_assembler.py # 上下文权威组装器 & Token 熔断
-│   ├── retriever.py         # LlamaIndex 检索路由
-│   ├── state_manager.py     # YAML/SQLite 读写 & Diff 生成
+│   ├── llm.py               # LiteLLM 封装
+│   ├── context_assembler.py # 上下文组装 & Token 熔断
+│   ├── retriever.py         # 检索路由
+│   ├── state_manager.py     # 快照/回滚/Diff
 │   └── parser.py            # Markdown/Frontmatter 解析
-├── agents/                  # 代理人格与逻辑
-│   ├── actor.py             # Actor 续写代理
-│   └── auditor.py           # Auditor 审阅代理
-├── storage/                 # 存储适配层
+├── agents/                  # 代理人格
+│   ├── actor.py             # Actor 沉浸式续写
+│   └── auditor.py           # Auditor 状态提取
+├── storage/                 # 存储适配
 │   ├── sqlite.py            # SQLite 事件账本
-│   └── vector.py            # 向量索引存储
-├── prompts/                 # Prompt 即资产 (外置)
-│   ├── actor.v1.md          # Actor 人格 Prompt
-│   └── auditor.v1.md        # Auditor 人格 Prompt
-└── schemas/                 # Pydantic/SQLModel 数据模型
-    ├── event.py             # 事件账本模型
-    └── character.py         # 角色档案模型
+│   └── vector.py            # 向量索引
+├── schemas/                 # 数据模型
+│   ├── character.py         # 角色档案模型
+│   └── event.py             # 事件账本模型
+└── prompts/                 # Prompt 即资产
+    ├── actor.v1.md          # Actor 人格 Prompt
+    └── auditor.v1.md        # Auditor 人格 Prompt
 ```
 
-## 测试
+---
 
-```bash
-# 运行全部测试
-pytest
+## 🤝 贡献
 
-# 运行指定模块测试
-pytest tests/test_schemas.py
-pytest tests/test_parser.py
-pytest tests/test_storage.py
+欢迎各种形式的贡献！无论是 Bug 报告、功能建议、文档改进还是代码提交。
 
-# 带覆盖率
-pytest --cov=loom
-```
+1. 阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解开发流程
+2. 查看 [Issues](https://github.com/Yaemikoreal/LOOM/issues) 寻找想解决的问题
+3. 阅读 [CLAUDE.md](CLAUDE.md) 了解架构约定
+4. Fork 并提交 Pull Request
 
-## 技术栈
+> **设计文档**: 在 `设计文档/` 目录下，包含详细的技术方案和 PRD（设计冻结，仅做参考）。
 
-| 层级 | 技术 | 用途 |
-|:---|:---|:---|
-| CLI 壳 | `Typer`, `Rich` | 命令路由、终端富文本/Diff 渲染 |
-| LLM 总线 | `LiteLLM`, `tenacity` | 统一模型调用、限流与重试容错 |
-| 检索引擎 | `LlamaIndex` | 文档解析、向量索引、语义路由 |
-| 向量化 | `BGE-M3` (本地) | 高质量中英文向量化，防数据泄漏 |
-| 数据校验 | `Pydantic V2`, `SQLModel` | 状态结构强类型校验，ORM 映射 |
-| 状态账本 | `SQLite` | 全局因果事件日志存储 |
-| 文件解析 | `python-frontmatter` | Markdown 与 YAML 的安全读写隔离 |
-| Token 熔断 | `tiktoken` | 上下文预算精确计算 |
-| 序列化 | `orjson` | 快照与状态高速读写 |
-| 图网络预留 | `networkx` | (Phase 2) 因果图与伏笔网 |
+---
 
-## 四条防爆铁律
+## 📄 许可证
 
-- **铁律 1：ID 即锚点** — 全局强制使用 Canonical IDs（`char_001`, `loc_london`），严禁用角色名做系统关联
-- **铁律 2：权威分级** — `[CANON] > [STATE MEMORY] > [SUBCONSCIOUS]`，灵感绝不可作为设定执行
-- **铁律 3：人工审核关口** — AI 只能提议状态变更，人类拥有绝对否决权（`loom commit` 的 Diff Review）
-- **铁律 4：操作可逆** — 任何破坏性写入前必须生成 Snapshot，支持 `loom rollback`
+本项目采用 [MIT 许可证](LICENSE)。  
+请遵守 [行为准则](CODE_OF_CONDUCT.md) 参与社区交流。
+
+---
+
+<p align="center">
+  <sub>以 Markdown 为笔，以 LLM 为线，编织你的叙事世界。</sub>
+  <br>
+  <sub>Built with ❤️ for writers who care about consistency.</sub>
+</p>

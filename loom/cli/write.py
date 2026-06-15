@@ -10,7 +10,6 @@
 import typer
 from rich import print as rprint
 from rich.console import Console
-from rich.live import Live
 
 from loom.core.llm import LLMBus
 from loom.core.retriever import Retriever
@@ -38,7 +37,7 @@ def write(
         rprint(f"[bold red]章节文件不存在:[/bold red] {chapter_path}")
         raise typer.Exit(1)
 
-    rprint(f"[bold cyan]L.O.O.M. write[/bold cyan] - 沉浸式续写")
+    rprint("[bold cyan]L.O.O.M. write[/bold cyan] - 沉浸式续写")
     rprint(f"章节: [bold]{chapter}[/bold]")
     rprint(f"模型: [dim]{model}[/dim]")
     rprint("[dim]输入空行触发续写，输入 :q 退出[/dim]\n")

@@ -8,7 +8,6 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ class VectorStore:
     def __init__(
         self,
         project_root: Path,
-        index_dir: Optional[Path] = None,
+        index_dir: Path | None = None,
         embedding_model: str = "BAAI/bge-m3",
     ) -> None:
         """初始化向量存储。
@@ -98,7 +97,7 @@ class VectorStore:
         # return [str(node) for node in response.source_nodes]
         return []
 
-    def add_document(self, text: str, metadata: Optional[dict] = None) -> None:
+    def add_document(self, text: str, metadata: dict | None = None) -> None:
         """向索引中添加单个文档，触发增量更新。
 
         Args:

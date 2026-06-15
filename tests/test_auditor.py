@@ -1,16 +1,15 @@
 """Auditor 模块测试 - 提取重试循环与急救模式。"""
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
 
-from loom.agents.auditor import Auditor, AuditorAbort, ExtractionResult
-from loom.schemas.event import EventCreate, EventType
+from loom.agents.auditor import Auditor, AuditorAbortError
+from loom.schemas.event import EventType
 from loom.storage.yaml_storage import YAMLStorage
-
 
 # ── Mock LiteLLM 响应对象（属性访问模式）──
 
@@ -123,9 +122,7 @@ class TestExtractEvents:
         assert events[0].event_id == "evt_ch001_001"
         assert events[0].event_type == EventType.INJURY
 
-    def test_extraction_with_empty_array(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_extraction_with_empty_array(self, empty_project_root: Path) -> None:
         """测试 LLM 返回空事件数组。"""
         llm_bus = MockLLMBus(["[]"])
         auditor = Auditor(
@@ -142,14 +139,14 @@ class TestExtractEvents:
 class TestRetryMechanism:
     """重试机制测试。"""
 
-    def test_retry_then_success(
-        self, empty_project_root: Path, valid_json_response: str
-    ) -> None:
+    def test_retry_then_success(self, empty_project_root: Path, valid_json_response: str) -> None:
         """测试第一次失败后重试成功。"""
-        llm_bus = MockLLMBus([
-            '{"broken": json}',  # JSONDecodeError
-            valid_json_response,
-        ])
+        llm_bus = MockLLMBus(
+            [
+                '{"broken": json}',  # JSONDecodeError
+                valid_json_response,
+            ]
+        )
         auditor = Auditor(
             llm_bus=llm_bus,  # type: ignore[arg-type]
             state_manager=MagicMock(),
@@ -167,11 +164,13 @@ class TestRetryMechanism:
         self, mock_prompt, empty_project_root: Path, invalid_json_response: str
     ) -> None:
         """测试所有重试都失败，触发 abort。"""
-        llm_bus = MockLLMBus([
-            invalid_json_response,
-            invalid_json_response,
-            invalid_json_response,
-        ])
+        llm_bus = MockLLMBus(
+            [
+                invalid_json_response,
+                invalid_json_response,
+                invalid_json_response,
+            ]
+        )
 
         auditor = Auditor(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -180,7 +179,7 @@ class TestRetryMechanism:
             prompt_path=empty_project_root / "prompts" / "auditor.v1.md",
         )
 
-        with pytest.raises(AuditorAbort):
+        with pytest.raises(AuditorAbortError):
             auditor.extract_events_with_retry("ch_001", "正文")
         assert llm_bus.call_count == 3
 
@@ -188,9 +187,7 @@ class TestRetryMechanism:
 class TestParseEventsFromText:
     """_parse_events_from_text 解析逻辑测试。"""
 
-    def test_parse_markdown_code_block(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_parse_markdown_code_block(self, empty_project_root: Path) -> None:
         """测试解析被 markdown 代码块包裹的 JSON。"""
         text = """```json
 [
@@ -214,9 +211,7 @@ class TestParseEventsFromText:
         assert len(events) == 1
         assert events[0].event_type == EventType.HEAL
 
-    def test_parse_single_object_not_array(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_parse_single_object_not_array(self, empty_project_root: Path) -> None:
         """测试 LLM 返回单个对象而非数组时的处理。"""
         text = """{
             "event_id": "evt_001",
@@ -235,9 +230,7 @@ class TestParseEventsFromText:
         events = auditor._parse_events_from_text(text, "ch_001")
         assert len(events) == 1
 
-    def test_parse_invalid_json(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_parse_invalid_json(self, empty_project_root: Path) -> None:
         """测试非法 JSON 抛出异常。"""
         auditor = Auditor(
             llm_bus=MagicMock(),
@@ -247,13 +240,10 @@ class TestParseEventsFromText:
         with pytest.raises(Exception) as exc_info:
             auditor._parse_events_from_text("{broken json}", "ch_001")
         assert any(
-            n in type(exc_info.value).__name__
-            for n in ["JSONDecodeError", "ValidationError"]
+            n in type(exc_info.value).__name__ for n in ["JSONDecodeError", "ValidationError"]
         )
 
-    def test_parse_missing_required_field(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_parse_missing_required_field(self, empty_project_root: Path) -> None:
         """测试缺少必填字段时抛出 ValidationError。"""
         text = """[{
             "event_id": "evt_001"
@@ -266,9 +256,7 @@ class TestParseEventsFromText:
         with pytest.raises(ValidationError):
             auditor._parse_events_from_text(text, "ch_001")
 
-    def test_parse_invalid_causal_pressure(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_parse_invalid_causal_pressure(self, empty_project_root: Path) -> None:
         """测试因果压强超范围。"""
         text = """[{
             "event_id": "evt_001",
@@ -291,9 +279,7 @@ class TestParseEventsFromText:
 class TestRescueMode:
     """人类急救模式测试。"""
 
-    def test_rescue_skip_writes_dirty_flag(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_rescue_skip_writes_dirty_flag(self, empty_project_root: Path) -> None:
         """测试脏提交写入 dirty_flag。"""
         chapter_path = empty_project_root / "draft" / "ch_001.md"
         storage = YAMLStorage()

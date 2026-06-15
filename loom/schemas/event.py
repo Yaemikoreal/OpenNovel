@@ -4,12 +4,11 @@
 每个事件通过 Canonical ID 关联角色/地点/物品，并携带因果压强指标。
 """
 
-from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlmodel import SQLModel, Field as SQLField
+from sqlmodel import Field as SQLField
+from sqlmodel import SQLModel
 
 
 class EventType(str, Enum):
@@ -59,9 +58,7 @@ class EventLogBase(SQLModel):
     def validate_character_id(cls, v: str) -> str:
         """校验角色 ID 遵循 Canonical ID 规范。"""
         if not v.startswith("char_"):
-            raise ValueError(
-                f"character_id 必须使用 Canonical ID 规范（char_xxx），当前值: {v}"
-            )
+            raise ValueError(f"character_id 必须使用 Canonical ID 规范（char_xxx），当前值: {v}")
         return v
 
 
@@ -74,10 +71,8 @@ class EventLog(EventLogBase, table=True):
 
     __tablename__ = "event_log"
 
-    id: Optional[int] = SQLField(default=None, primary_key=True)
-    created_at: Optional[str] = SQLField(
-        default=None, description="记录创建时间（系统时间）"
-    )
+    id: int | None = SQLField(default=None, primary_key=True)
+    created_at: str | None = SQLField(default=None, description="记录创建时间（系统时间）")
 
 
 class EventCreate(BaseModel):
@@ -89,9 +84,7 @@ class EventCreate(BaseModel):
     character_id: str = Field(description="关联角色 Canonical ID")
     event_type: EventType = Field(description="事件类型")
     description: str = Field(description="事件描述")
-    causal_pressure: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="因果压强"
-    )
+    causal_pressure: float = Field(default=0.5, ge=0.0, le=1.0, description="因果压强")
 
 
 class EventDiff(BaseModel):
@@ -99,7 +92,7 @@ class EventDiff(BaseModel):
 
     action: str = Field(description="操作类型: add / remove / modify")
     event: EventCreate = Field(description="涉及的事件")
-    before: Optional[EventCreate] = Field(default=None, description="修改前的事件（仅 modify 操作）")
+    before: EventCreate | None = Field(default=None, description="修改前的事件（仅 modify 操作）")
 
 
 class SnapshotMeta(BaseModel):

@@ -30,9 +30,8 @@ def commit(
     """提取章节状态并固化，强制 Diff Review + 前置快照。"""
     from pathlib import Path
 
-    from loom.agents.auditor import Auditor, AuditorAbort
+    from loom.agents.auditor import Auditor, AuditorAbortError
     from loom.storage.yaml_storage import YAMLStorage
-    from loom.core.retriever import Retriever
 
     project_root = Path(path).resolve()
     chapter_path = project_root / "draft" / chapter
@@ -41,7 +40,7 @@ def commit(
         rprint(f"[bold red]章节文件不存在:[/bold red] {chapter_path}")
         raise typer.Exit(1)
 
-    rprint(f"[bold cyan]L.O.O.M. commit[/bold cyan] - 状态审阅与固化")
+    rprint("[bold cyan]L.O.O.M. commit[/bold cyan] - 状态审阅与固化")
     rprint(f"章节: [bold]{chapter}[/bold]\n")
 
     # 初始化存储
@@ -67,7 +66,6 @@ def commit(
     # Step 2: Auditor 提取事件
     rprint("[bold]Step 2/5[/bold] Auditor 提取事件...")
     llm_bus = LLMBus(model=model)
-    retriever = Retriever(project_root)
     auditor = Auditor(
         llm_bus=llm_bus,
         state_manager=manager,
@@ -76,10 +74,8 @@ def commit(
     )
 
     try:
-        result = auditor.extract_events_with_retry(
-            chapter_id, body, active_chars
-        )
-    except AuditorAbort:
+        result = auditor.extract_events_with_retry(chapter_id, body, active_chars)
+    except AuditorAbortError:
         rprint("[yellow]用户终止 commit[/yellow]")
         return
 

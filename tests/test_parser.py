@@ -1,10 +1,8 @@
 """parser 模块测试 - Markdown 文本切分。"""
 
-import pytest
-
 from loom.core.parser import (
-    split_chapter_into_scenes,
     count_text_tokens,
+    split_chapter_into_scenes,
     truncate_to_budget,
 )
 

@@ -8,7 +8,8 @@
 """
 
 import logging
-from typing import Any, AsyncIterator, Optional
+from collections.abc import AsyncIterator
+from typing import Any
 
 from litellm import acompletion, completion
 from tenacity import (
@@ -63,9 +64,9 @@ class LLMBus:
     def chat(
         self,
         messages: list[dict[str, str]],
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """同步调用 LLM 进行对话。
@@ -103,9 +104,9 @@ class LLMBus:
     async def achat(
         self,
         messages: list[dict[str, str]],
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """异步调用 LLM 进行对话。
@@ -132,9 +133,9 @@ class LLMBus:
     async def achat_stream(
         self,
         messages: list[dict[str, str]],
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[str]:
         """异步流式调用 LLM，逐 Token 返回生成内容。

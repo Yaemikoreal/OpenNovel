@@ -8,7 +8,6 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class Retriever:
     - subconscious: 潜意识池索引，用于灵感碎片的语义召回
     """
 
-    def __init__(self, project_root: Path, persist_dir: Optional[Path] = None) -> None:
+    def __init__(self, project_root: Path, persist_dir: Path | None = None) -> None:
         """初始化检索路由器。
 
         Args:
@@ -99,7 +98,7 @@ class Retriever:
         # TODO: 实现 LlamaIndex 查询
         return ""
 
-    def add_to_subconscious(self, text: str, tags: Optional[list[str]] = None) -> None:
+    def add_to_subconscious(self, text: str, tags: list[str] | None = None) -> None:
         """向潜意识池添加新的灵感碎片，并触发增量索引更新。
 
         Args:

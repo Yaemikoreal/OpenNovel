@@ -8,8 +8,8 @@ Actor 是作者的 AI 写作伙伴，核心职责：
 """
 
 import logging
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import AsyncIterator, Optional
 
 from loom.core.context_assembler import assemble_actor_context
 from loom.core.llm import LLMBus, extract_text_from_response
@@ -32,7 +32,7 @@ class Actor:
         llm_bus: LLMBus,
         retriever: Retriever,
         project_root: Path,
-        prompt_path: Optional[Path] = None,
+        prompt_path: Path | None = None,
     ) -> None:
         """初始化 Actor 代理。
 

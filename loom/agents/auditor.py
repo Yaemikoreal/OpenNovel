@@ -12,10 +12,8 @@ Auditor 是 L.O.O.M. 的"审稿官"，核心职责：
 
 import json
 import logging
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from pydantic import ValidationError
 
@@ -29,7 +27,7 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 2  # 初始尝试外最多重试 2 次（共 3 次）
 
 
-class AuditorAbort(Exception):
+class AuditorAbortError(Exception):
     """用户选择终止 commit 时抛出。"""
 
     pass
@@ -42,7 +40,7 @@ class ExtractionResult:
     events: list[EventCreate] = field(default_factory=list)
     success: bool = True
     dirty: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class Auditor:
@@ -62,8 +60,8 @@ class Auditor:
         llm_bus: LLMBus,
         state_manager: StateManager,
         project_root: Path,
-        prompt_path: Optional[Path] = None,
-        yaml_storage: Optional[YAMLStorage] = None,
+        prompt_path: Path | None = None,
+        yaml_storage: YAMLStorage | None = None,
     ) -> None:
         """初始化 Auditor 代理。
 
@@ -95,7 +93,7 @@ class Auditor:
         self,
         chapter_id: str,
         chapter_text: str,
-        active_characters: Optional[list[str]] = None,
+        active_characters: list[str] | None = None,
     ) -> list[EventCreate]:
         """（向后兼容）从正文中提取结构化事件，旧版本单次调用接口。
 
@@ -109,16 +107,14 @@ class Auditor:
         Returns:
             提取到的事件列表
         """
-        result = self.extract_events_with_retry(
-            chapter_id, chapter_text, active_characters
-        )
+        result = self.extract_events_with_retry(chapter_id, chapter_text, active_characters)
         return result.events
 
     def extract_events_with_retry(
         self,
         chapter_id: str,
         chapter_text: str,
-        active_characters: Optional[list[str]] = None,
+        active_characters: list[str] | None = None,
     ) -> ExtractionResult:
         """从正文中提取结构化事件，含自动重试纠偏和人类急救模式。
 
@@ -154,8 +150,8 @@ class Auditor:
             },
         ]
 
-        last_error: Optional[str] = None
-        last_raw_text: Optional[str] = None
+        last_error: str | None = None
+        last_raw_text: str | None = None
 
         for attempt in range(MAX_RETRIES + 1):
             try:
@@ -165,17 +161,17 @@ class Auditor:
                 if not raw_text:
                     last_error = "LLM 返回空文本"
                     last_raw_text = raw_text
-                    logger.warning(
-                        "Auditor 提取为空（第 %d 次）", attempt + 1
-                    )
+                    logger.warning("Auditor 提取为空（第 %d 次）", attempt + 1)
                     if attempt < MAX_RETRIES:
-                        messages.append({
-                            "role": "user",
-                            "content": (
-                                "你的输出为空。请输出一个合法的 JSON 事件数组，"
-                                "如果没有事件则输出 []。"
-                            ),
-                        })
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": (
+                                    "你的输出为空。请输出一个合法的 JSON 事件数组，"
+                                    "如果没有事件则输出 []。"
+                                ),
+                            }
+                        )
                     continue
 
                 events = self._parse_events_from_text(raw_text, chapter_id)
@@ -202,18 +198,12 @@ class Auditor:
                     messages.append({"role": "user", "content": error_feedback})
                 else:
                     # 超过最大重试次数，进入人类急救模式
-                    return self._trigger_rescue_mode(
-                        chapter_id, last_raw_text or "", last_error
-                    )
+                    return self._trigger_rescue_mode(chapter_id, last_raw_text or "", last_error)
 
         # 不应该到达这里，但防御性返回
-        return ExtractionResult(
-            events=[], success=False, error=last_error
-        )
+        return ExtractionResult(events=[], success=False, error=last_error)
 
-    def _parse_events_from_text(
-        self, text: str, chapter_id: str
-    ) -> list[EventCreate]:
+    def _parse_events_from_text(self, text: str, chapter_id: str) -> list[EventCreate]:
         """解析 LLM 输出的 JSON 事件列表。
 
         Args:
@@ -232,10 +222,7 @@ class Auditor:
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
             # 移除 ```json 或 ``` 标记行
-            cleaned = "\n".join(
-                line for line in lines
-                if not line.strip().startswith("```")
-            )
+            cleaned = "\n".join(line for line in lines if not line.strip().startswith("```"))
 
         raw_events = json.loads(cleaned)
         if not isinstance(raw_events, list):
@@ -271,12 +258,14 @@ class Auditor:
 
         console = Console()
 
-        console.print(Panel(
-            f"[bold red]Auditor 提取失败（连续 {MAX_RETRIES + 1} 次）[/bold red]\n"
-            f"错误信息: {error_msg}\n\n"
-            f"最后的输出:\n{failed_output}",
-            title="🚨 系统警告",
-        ))
+        console.print(
+            Panel(
+                f"[bold red]Auditor 提取失败（连续 {MAX_RETRIES + 1} 次）[/bold red]\n"
+                f"错误信息: {error_msg}\n\n"
+                f"最后的输出:\n{failed_output}",
+                title="🚨 系统警告",
+            )
+        )
 
         choice = Prompt.ask(
             "请选择操作",
@@ -294,7 +283,7 @@ class Auditor:
 
         else:
             # [A]bort：终止 commit
-            raise AuditorAbort("用户终止 commit")
+            raise AuditorAbortError("用户终止 commit")
 
     def _rescue_edit(
         self,
@@ -311,7 +300,6 @@ class Auditor:
             修补后校验通过的结果
         """
         from rich.console import Console
-        from rich.prompt import Prompt
 
         console = Console()
         console.print("[yellow]请输入修补后的合法 JSON 数组（或输入空行取消）:[/yellow]")
@@ -332,9 +320,7 @@ class Auditor:
 
         if not lines:
             console.print("[yellow]未提供有效 JSON，放弃修补[/yellow]")
-            return ExtractionResult(
-                events=[], success=False, error="用户取消手动编辑"
-            )
+            return ExtractionResult(events=[], success=False, error="用户取消手动编辑")
 
         try:
             fixed = "\n".join(lines)
@@ -343,9 +329,7 @@ class Auditor:
             return ExtractionResult(events=events, success=True)
         except (json.JSONDecodeError, ValidationError) as e:
             console.print(f"[red]手动编辑的 JSON 仍然无效: {e}[/red]")
-            return ExtractionResult(
-                events=[], success=False, error=str(e)
-            )
+            return ExtractionResult(events=[], success=False, error=str(e))
 
     def _rescue_skip(self, chapter_id: str) -> ExtractionResult:
         """[S]kip 模式：脏提交，在 Frontmatter 中打上 dirty_flag。
@@ -393,9 +377,7 @@ class Auditor:
         """
         return [EventDiff(action="add", event=event) for event in events]
 
-    def apply_confirmed_events(
-        self, events: list[EventCreate], chapter_id: str
-    ) -> list[str]:
+    def apply_confirmed_events(self, events: list[EventCreate], chapter_id: str) -> list[str]:
         """将经过人工确认的事件写入状态。
 
         Args:

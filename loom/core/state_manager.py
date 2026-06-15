@@ -9,10 +9,10 @@
 铁律 4：操作可逆。任何破坏性写入前必须生成 Snapshot。
 """
 
+import contextlib
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import orjson
 
@@ -37,8 +37,8 @@ class StateManager:
     def __init__(
         self,
         project_root: Path,
-        db_path: Optional[Path] = None,
-        yaml_storage: Optional[YAMLStorage] = None,
+        db_path: Path | None = None,
+        yaml_storage: YAMLStorage | None = None,
     ) -> None:
         """初始化状态管理器。
 
@@ -50,7 +50,7 @@ class StateManager:
         self.project_root = project_root
         self.snapshots_dir = project_root / ".snapshots"
         self.snapshots_dir.mkdir(parents=True, exist_ok=True)
-        self._event_store: Optional[EventStore] = None
+        self._event_store: EventStore | None = None
         self._db_path = db_path or project_root / ".loom.db"
         self._yaml_storage = yaml_storage or YAMLStorage()
 
@@ -67,7 +67,7 @@ class StateManager:
         return self._yaml_storage
 
     def create_snapshot(
-        self, chapter_id: str, affected_files: Optional[list[Path]] = None
+        self, chapter_id: str, affected_files: list[Path] | None = None
     ) -> SnapshotMeta:
         """创建文件级增量快照，仅记录受影响文件的 Frontmatter。
 
@@ -89,10 +89,7 @@ class StateManager:
             for file_path in affected_files:
                 if file_path.exists():
                     metadata, _ = self._yaml_storage.read_markdown_file(file_path)
-                    rel_path = str(
-                        file_path.relative_to(self.project_root)
-                        .as_posix()
-                    )
+                    rel_path = str(file_path.relative_to(self.project_root).as_posix())
                     delta_files[rel_path] = {
                         "fm_before": _serialize_frontmatter(metadata),
                         "fm_after": None,
@@ -137,9 +134,7 @@ class StateManager:
         for file_path in affected_files:
             if file_path.exists():
                 metadata, _ = self._yaml_storage.read_markdown_file(file_path)
-                rel_path = str(
-                    file_path.relative_to(self.project_root).as_posix()
-                )
+                rel_path = str(file_path.relative_to(self.project_root).as_posix())
                 if rel_path in delta_files:
                     delta_files[rel_path]["fm_after"] = _serialize_frontmatter(metadata)
 
@@ -202,29 +197,21 @@ class StateManager:
             else:
                 # 没有 fm_after（快照异常），直接覆写 fm_before
                 _, body = self._yaml_storage.read_markdown_file(file_path)
-                self._yaml_storage.write_markdown_file(
-                    file_path, fm_before, body
-                )
+                self._yaml_storage.write_markdown_file(file_path, fm_before, body)
                 logger.info("已强制恢复文件: %s", rel_path)
 
         # 恢复 SQLite 事件
-        events_added = (
-            data.get("delta_sqlite", {}).get("event_ids_to_rollback", [])
-        )
+        events_added = data.get("delta_sqlite", {}).get("event_ids_to_rollback", [])
         if events_added:
             self.event_store.delete_events_by_ids(events_added)
             logger.info("已删除 %d 条事件记录", len(events_added))
 
         if rollback_errors:
-            logger.warning(
-                "回滚完成，%d 个文件因冲突跳过", len(rollback_errors)
-            )
+            logger.warning("回滚完成，%d 个文件因冲突跳过", len(rollback_errors))
 
         return True
 
-    def apply_character_diff(
-        self, character_id: str, updates: dict
-    ) -> CharacterFrontmatter:
+    def apply_character_diff(self, character_id: str, updates: dict) -> CharacterFrontmatter:
         """将角色状态变更应用到 Frontmatter。
 
         Args:
@@ -237,15 +224,11 @@ class StateManager:
         Raises:
             FileNotFoundError: 角色文件不存在
         """
-        char_path = (
-            self.project_root / "characters" / f"{character_id}.md"
-        )
+        char_path = self.project_root / "characters" / f"{character_id}.md"
         if not char_path.exists():
             raise FileNotFoundError(f"角色文件不存在: {char_path}")
 
-        new_metadata = self._yaml_storage.update_frontmatter(
-            char_path, updates
-        )
+        new_metadata = self._yaml_storage.update_frontmatter(char_path, updates)
         return CharacterFrontmatter(**new_metadata)
 
     def apply_event(self, event: EventCreate) -> None:
@@ -293,9 +276,7 @@ class StateManager:
             快照元数据列表
         """
         snapshots: list[SnapshotMeta] = []
-        for snapshot_file in sorted(
-            self.snapshots_dir.glob("*.snapshot.json"), reverse=True
-        ):
+        for snapshot_file in sorted(self.snapshots_dir.glob("*.snapshot.json"), reverse=True):
             try:
                 with open(snapshot_file, "rb") as f:
                     data = orjson.loads(f.read())
@@ -326,8 +307,6 @@ def _serialize_frontmatter(metadata: dict) -> dict:
         elif isinstance(value, (list, str, int, float, bool, type(None))):
             result[key] = value
         else:
-            try:
+            with contextlib.suppress(Exception):
                 result[key] = str(value)
-            except Exception:
-                pass
     return result

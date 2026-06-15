@@ -7,7 +7,6 @@
 """
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -15,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 class AuthorityLevel(str, Enum):
     """上下文权威等级枚举，定义注入时的优先级。"""
 
-    CANON = "CANON"              # 不可变设定，最高权威
+    CANON = "CANON"  # 不可变设定，最高权威
     STATE_MEMORY = "STATE_MEMORY"  # 角色当前状态，中等权威
     SUBCONSCIOUS = "SUBCONSCIOUS"  # 灵感碎片，最低权威
 
@@ -23,7 +22,9 @@ class AuthorityLevel(str, Enum):
 class PhysicalState(BaseModel):
     """角色物理状态模型，记录伤势、能力等身体状态。"""
 
-    injuries: list[str] = Field(default_factory=list, description="当前伤势列表，如 ['left_arm_fracture']")
+    injuries: list[str] = Field(
+        default_factory=list, description="当前伤势列表，如 ['left_arm_fracture']"
+    )
     buffs: list[str] = Field(default_factory=list, description="当前增益效果列表")
     debuffs: list[str] = Field(default_factory=list, description="当前减益效果列表")
 
@@ -51,9 +52,7 @@ class EmotionVector(BaseModel):
         """校验自定义情绪值在合法范围内。"""
         for key, value in v.items():
             if not 0.0 <= value <= 1.0:
-                raise ValueError(
-                    f"自定义情绪 '{key}' 的值 {value} 超出范围 [0.0, 1.0]"
-                )
+                raise ValueError(f"自定义情绪 '{key}' 的值 {value} 超出范围 [0.0, 1.0]")
         return v
 
 
@@ -66,7 +65,9 @@ class CharacterFrontmatter(BaseModel):
     id: str = Field(description="Canonical ID，如 char_001，全局唯一锚点")
     name: str = Field(description="角色当前代号/姓名")
     aliases: list[str] = Field(default_factory=list, description="历史曾用名/代号列表")
-    location: Optional[str] = Field(default=None, description="当前所在地点 Canonical ID，如 loc_tower")
+    location: str | None = Field(
+        default=None, description="当前所在地点 Canonical ID，如 loc_tower"
+    )
     physical: PhysicalState = Field(default_factory=PhysicalState, description="物理状态")
     emotional: EmotionVector = Field(default_factory=EmotionVector, description="情绪状态")
     inventory: list[str] = Field(default_factory=list, description="持有物品 Canonical ID 列表")
@@ -82,7 +83,7 @@ class CharacterFrontmatter(BaseModel):
 
     @field_validator("location")
     @classmethod
-    def validate_location(cls, v: Optional[str]) -> Optional[str]:
+    def validate_location(cls, v: str | None) -> str | None:
         """校验地点 ID 遵循 Canonical ID 规范。"""
         if v is not None and not v.startswith("loc_"):
             raise ValueError(f"地点 ID 必须使用 loc_xxx 格式，当前值: {v}")
@@ -101,5 +102,5 @@ class CharacterDiff(BaseModel):
 
     character_id: str = Field(description="角色 Canonical ID")
     field_path: str = Field(description="变更字段的路径，如 'physical.injuries'")
-    before: Optional[str] = Field(default=None, description="变更前的值")
-    after: Optional[str] = Field(default=None, description="变更后的值")
+    before: str | None = Field(default=None, description="变更前的值")
+    after: str | None = Field(default=None, description="变更后的值")

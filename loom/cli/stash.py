@@ -31,7 +31,7 @@ def stash(
         rprint("[bold red]项目未初始化！[/bold red] 请先运行 [bold]loom init[/bold]")
         raise typer.Exit(1)
 
-    rprint(f"[bold cyan]L.O.O.M. stash[/bold cyan] - 灵感潜意识池")
+    rprint("[bold cyan]L.O.O.M. stash[/bold cyan] - 灵感潜意识池")
 
     # 写入灵感
     retriever = Retriever(project_root)

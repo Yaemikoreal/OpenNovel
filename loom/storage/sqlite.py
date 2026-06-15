@@ -9,7 +9,6 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from sqlmodel import Session, SQLModel, create_engine, select
 
@@ -95,7 +94,7 @@ class EventStore:
         logger.info("批量入库 %d 条事件", len(records))
         return records
 
-    def get_event_by_id(self, event_id: str) -> Optional[EventLog]:
+    def get_event_by_id(self, event_id: str) -> EventLog | None:
         """根据事件 ID 查询单条事件。
 
         Args:
@@ -119,9 +118,7 @@ class EventStore:
         """
         with Session(self._engine) as session:
             statement = (
-                select(EventLog)
-                .where(EventLog.chapter_id == chapter_id)
-                .order_by(EventLog.id)
+                select(EventLog).where(EventLog.chapter_id == chapter_id).order_by(EventLog.id)
             )
             return list(session.exec(statement).all())
 

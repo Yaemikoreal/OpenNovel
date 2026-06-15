@@ -79,9 +79,15 @@ class TestEventCreate:
     def test_event_type_enum(self) -> None:
         """测试事件类型枚举完整性。"""
         expected_types = {
-            "INJURY", "HEAL", "ITEM_GAIN", "ITEM_LOSS",
-            "KNOWLEDGE", "LOCATION_CHANGE", "EMOTION_SHIFT",
-            "RELATIONSHIP_CHANGE", "CUSTOM",
+            "INJURY",
+            "HEAL",
+            "ITEM_GAIN",
+            "ITEM_LOSS",
+            "KNOWLEDGE",
+            "LOCATION_CHANGE",
+            "EMOTION_SHIFT",
+            "RELATIONSHIP_CHANGE",
+            "CUSTOM",
         }
         actual_types = {e.value for e in EventType}
         assert actual_types == expected_types

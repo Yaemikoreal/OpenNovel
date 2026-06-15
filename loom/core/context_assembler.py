@@ -11,9 +11,7 @@
 """
 
 import logging
-from enum import IntEnum
 from pathlib import Path
-from typing import Optional
 
 import tiktoken
 
@@ -93,7 +91,7 @@ class ContextMessage:
         self,
         role: str,
         content: str,
-        authority: Optional[AuthorityLevel] = None,
+        authority: AuthorityLevel | None = None,
     ) -> None:
         """初始化上下文消息。
 
@@ -154,10 +152,10 @@ def assemble_actor_context(
     chapter_path: Path,
     project_root: Path,
     current_text: str,
-    prompt_path: Optional[Path] = None,
+    prompt_path: Path | None = None,
     canon_content: str = "",
     subconscious_content: str = "",
-    yaml_storage: Optional[YAMLStorage] = None,
+    yaml_storage: YAMLStorage | None = None,
 ) -> list[dict[str, str]]:
     """组装 Actor 代理的完整上下文，带 Token 熔断与权威分级。
 
@@ -226,16 +224,12 @@ def assemble_actor_context(
     # 4. 潜意识 (SUBCONSCIOUS | LOW)
     sub_budget = int(INPUT_TOKEN_BUDGET * BUDGET_RATIOS[AuthorityLevel.SUBCONSCIOUS])
     if subconscious_content:
-        sub_text = wrap_with_authority_tag(
-            subconscious_content, AuthorityLevel.SUBCONSCIOUS
-        )
+        sub_text = wrap_with_authority_tag(subconscious_content, AuthorityLevel.SUBCONSCIOUS)
         sub_tokens = counter.count(sub_text)
         if sub_tokens > sub_budget:
             sub_text = counter.truncate_to_budget(sub_text, sub_budget)
             sub_tokens = sub_budget
-        msg = ContextMessage(
-            role="system", content=sub_text, authority=AuthorityLevel.SUBCONSCIOUS
-        )
+        msg = ContextMessage(role="system", content=sub_text, authority=AuthorityLevel.SUBCONSCIOUS)
         msg.token_count = sub_tokens
         messages.append(msg)
         total_tokens += sub_tokens
