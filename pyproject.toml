@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "loom"
+version = "1.0.1"
+description = "L.O.O.M. (Living Organic Outline Machine) - 本地优先的长篇小说叙事操作系统"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "L.O.O.M. Team"}
+]
+keywords = ["novel", "writing", "ai", "narrative", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Linguistic",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "litellm>=1.0.0",
+    "tenacity>=8.2.0",
+    "llama-index>=0.10.0",
+    "pydantic>=2.0.0",
+    "sqlmodel>=0.0.14",
+    "python-frontmatter>=1.0.0",
+    "tiktoken>=0.5.0",
+    "orjson>=3.9.0",
+    "networkx>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+]
+local-embedding = [
+    "sentence-transformers>=2.2.0",
+]
+
+[project.scripts]
+loom = "loom.cli.main:app"
+
+[tool.setuptools.packages.find]
+include = ["loom*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

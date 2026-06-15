@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Temp files
+*.tmp
+.tmp_*
+
+# Loom specific
+.loom.db
+.index/
+.snapshots/
