@@ -37,10 +37,11 @@ def init(
     """初始化小说项目目录，生成标准 ID 模板。"""
     from pathlib import Path
 
-    from loom.core.parser import write_markdown_file
+    from loom.storage.yaml_storage import YAMLStorage
 
     project_root = Path(path).resolve()
     rprint(f"[bold cyan]L.O.O.M.[/bold cyan] 正在初始化项目: {project_root}")
+    storage = YAMLStorage()
 
     # 创建标准目录结构
     directories = [
@@ -69,7 +70,7 @@ def init(
     }
     char_path = project_root / "characters" / "char_001.md"
     if not char_path.exists():
-        write_markdown_file(
+        storage.write_markdown_file(
             char_path,
             char_template,
             "# 角色背景\n\n在此自由书写角色的背景故事...",
@@ -83,7 +84,7 @@ def init(
     }
     canon_path = project_root / "canon" / "world_rules.md"
     if not canon_path.exists():
-        write_markdown_file(
+        storage.write_markdown_file(
             canon_path,
             canon_template,
             "# 世界观设定\n\n在此书写不可违反的世界观规则...",
@@ -99,7 +100,7 @@ def init(
     }
     chapter_path = project_root / "draft" / "ch_001.md"
     if not chapter_path.exists():
-        write_markdown_file(
+        storage.write_markdown_file(
             chapter_path,
             chapter_template,
             "# 第一章\n\n",

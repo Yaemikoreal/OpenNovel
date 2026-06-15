@@ -17,13 +17,8 @@ from typing import Optional
 
 import tiktoken
 
-from loom.core.parser import (
-    extract_active_characters,
-    extract_pov_character_id,
-    parse_character_file,
-    parse_markdown_file,
-)
 from loom.schemas.character import AuthorityLevel
+from loom.storage.yaml_storage import YAMLStorage
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +157,7 @@ def assemble_actor_context(
     prompt_path: Optional[Path] = None,
     canon_content: str = "",
     subconscious_content: str = "",
+    yaml_storage: Optional[YAMLStorage] = None,
 ) -> list[dict[str, str]]:
     """组装 Actor 代理的完整上下文，带 Token 熔断与权威分级。
 
@@ -206,11 +202,12 @@ def assemble_actor_context(
 
     # 3. 角色状态 (STATE MEMORY | MEDIUM)
     state_budget = int(INPUT_TOKEN_BUDGET * BUDGET_RATIOS[AuthorityLevel.STATE_MEMORY])
-    pov_id = extract_pov_character_id(chapter_path)
+    storage = yaml_storage or YAMLStorage()
+    pov_id = storage.extract_pov_character_id(chapter_path)
     if pov_id:
         char_path = project_root / "characters" / f"{pov_id}.md"
         if char_path.exists():
-            char_file = parse_character_file(char_path)
+            char_file = storage.read_character_file(char_path)
             state_text = wrap_with_authority_tag(
                 char_file.frontmatter.model_dump_json(indent=2),
                 AuthorityLevel.STATE_MEMORY,

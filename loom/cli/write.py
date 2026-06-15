@@ -29,7 +29,7 @@ def write(
     from pathlib import Path
 
     from loom.agents.actor import Actor
-    from loom.core.parser import parse_markdown_file
+    from loom.storage.yaml_storage import YAMLStorage
 
     project_root = Path(path).resolve()
     chapter_path = project_root / "draft" / chapter
@@ -47,9 +47,10 @@ def write(
     llm_bus = LLMBus(model=model)
     retriever = Retriever(project_root)
     actor = Actor(llm_bus=llm_bus, retriever=retriever, project_root=project_root)
+    storage = YAMLStorage()
 
     # 读取当前正文
-    _, current_text = parse_markdown_file(chapter_path)
+    current_text = storage.read_body(chapter_path)
 
     while True:
         try:

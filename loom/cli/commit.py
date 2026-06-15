@@ -31,7 +31,7 @@ def commit(
     from pathlib import Path
 
     from loom.agents.auditor import Auditor
-    from loom.core.parser import extract_active_characters, parse_markdown_file
+    from loom.storage.yaml_storage import YAMLStorage
     from loom.core.retriever import Retriever
 
     project_root = Path(path).resolve()
@@ -44,12 +44,24 @@ def commit(
     rprint(f"[bold cyan]L.O.O.M. commit[/bold cyan] - 状态审阅与固化")
     rprint(f"章节: [bold]{chapter}[/bold]\n")
 
+    # 初始化存储
+    storage = YAMLStorage()
+
     # Step 1: 生成快照（铁律 4）
     rprint("[bold]Step 1/5[/bold] 生成快照...")
     manager = StateManager(project_root)
-    metadata, body = parse_markdown_file(chapter_path)
-    chapter_id = metadata.get("id", chapter.replace(".md", ""))
-    snapshot = manager.create_snapshot(chapter_id)
+    chapter_meta, body = storage.read_markdown_file(chapter_path)
+    chapter_id = chapter_meta.get("id", chapter.replace(".md", ""))
+
+    # 确定受影响的文件（章节 + 活跃角色）
+    active_chars = storage.extract_active_characters(chapter_path)
+    affected_files = [chapter_path]
+    for char_id in active_chars:
+        char_path = project_root / "characters" / f"{char_id}.md"
+        if char_path.exists():
+            affected_files.append(char_path)
+
+    snapshot = manager.create_snapshot(chapter_id, affected_files=affected_files)
     rprint(f"  [green]✓[/green] 快照已创建: {snapshot.snapshot_id}\n")
 
     # Step 2: Auditor 提取事件
@@ -60,7 +72,6 @@ def commit(
         llm_bus=llm_bus, state_manager=manager, project_root=project_root
     )
 
-    active_chars = extract_active_characters(chapter_path)
     events = auditor.extract_events(chapter_id, body, active_chars)
 
     if not events:
@@ -101,14 +112,7 @@ def commit(
     rprint("\n[bold]Step 5/5[/bold] 写入固化...")
     event_ids = auditor.apply_confirmed_events(events, chapter_id)
 
-    # 更新快照的 after 状态
-    frontmatter_after: dict = {}
-    characters_dir = project_root / "characters"
-    if characters_dir.exists():
-        for char_file in characters_dir.glob("*.md"):
-            char_meta, _ = parse_markdown_file(char_file)
-            frontmatter_after[char_file.stem] = char_meta
-
-    manager.update_snapshot_after(snapshot.snapshot_id, frontmatter_after, event_ids)
+    # 更新快照的 after 状态（只更新受影响的文件）
+    manager.update_snapshot_after(snapshot.snapshot_id, affected_files, event_ids)
 
     rprint(f"[bold green]✓ 已固化 {len(event_ids)} 个事件[/bold green]")

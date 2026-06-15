@@ -103,11 +103,20 @@ class EventDiff(BaseModel):
 
 
 class SnapshotMeta(BaseModel):
-    """快照元数据模型，记录每次 commit 前的系统状态摘要。"""
+    """快照元数据模型，采用文件级增量结构。
 
-    snapshot_id: str = Field(description="快照唯一标识")
-    chapter_id: str = Field(description="关联章节 ID")
+    只记录本次 commit 实际涉及的文件（章节 + 角色），不扫描无关文件。
+    回滚时校验 fm_after 防止覆盖人类在间隙中的手动修改。
+    """
+
+    snapshot_id: str = Field(description="快照唯一标识，如 snap_ch_001_1698765432")
+    source_command: str = Field(description="触发快照的命令，如 commit ch_001")
     timestamp: str = Field(description="快照生成时间（系统时间）")
-    frontmatter_before: dict = Field(description="commit 前的 Frontmatter 状态")
-    frontmatter_after: Optional[dict] = Field(default=None, description="commit 后的 Frontmatter 状态")
-    events_added: list[str] = Field(default_factory=list, description="新增的事件 ID 列表")
+    delta_files: dict[str, dict] = Field(
+        default_factory=dict,
+        description="文件级增量，key=文件相对路径，value={'fm_before': {...}, 'fm_after': {...}}",
+    )
+    delta_sqlite: dict = Field(
+        default_factory=lambda: {"event_ids_to_rollback": []},
+        description="SQLite 增量，需回滚的事件 ID 列表",
+    )

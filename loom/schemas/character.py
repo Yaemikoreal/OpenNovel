@@ -28,14 +28,33 @@ class PhysicalState(BaseModel):
     debuffs: list[str] = Field(default_factory=list, description="当前减益效果列表")
 
 
-class EmotionalState(BaseModel):
-    """角色情绪状态模型，使用连续值表示情绪维度。"""
+class EmotionVector(BaseModel):
+    """角色情绪向量模型，使用命名维度表示情绪状态。
+
+    核心维度固定为五个（grief/anger/fear/joy/determination），
+    同时支持通过 extras 自由扩展自定义情绪字段（如 jealousy、shame、hope 等）。
+    """
 
     grief: float = Field(default=0.0, ge=0.0, le=1.0, description="悲伤程度")
     anger: float = Field(default=0.0, ge=0.0, le=1.0, description="愤怒程度")
     fear: float = Field(default=0.0, ge=0.0, le=1.0, description="恐惧程度")
     joy: float = Field(default=0.0, ge=0.0, le=1.0, description="喜悦程度")
     determination: float = Field(default=0.0, ge=0.0, le=1.0, description="决心程度")
+    extras: dict[str, float] = Field(
+        default_factory=dict,
+        description="自定义情绪维度，key=情绪名，value=强度 0.0~1.0",
+    )
+
+    @field_validator("extras")
+    @classmethod
+    def validate_extras(cls, v: dict[str, float]) -> dict[str, float]:
+        """校验自定义情绪值在合法范围内。"""
+        for key, value in v.items():
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(
+                    f"自定义情绪 '{key}' 的值 {value} 超出范围 [0.0, 1.0]"
+                )
+        return v
 
 
 class CharacterFrontmatter(BaseModel):
@@ -49,7 +68,7 @@ class CharacterFrontmatter(BaseModel):
     aliases: list[str] = Field(default_factory=list, description="历史曾用名/代号列表")
     location: Optional[str] = Field(default=None, description="当前所在地点 Canonical ID，如 loc_tower")
     physical: PhysicalState = Field(default_factory=PhysicalState, description="物理状态")
-    emotional: EmotionalState = Field(default_factory=EmotionalState, description="情绪状态")
+    emotional: EmotionVector = Field(default_factory=EmotionVector, description="情绪状态")
     inventory: list[str] = Field(default_factory=list, description="持有物品 Canonical ID 列表")
     knowledge: list[str] = Field(default_factory=list, description="已知信息/知识列表")
 

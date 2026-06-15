@@ -5,10 +5,10 @@ from pydantic import ValidationError
 
 from loom.schemas.character import (
     CharacterFrontmatter,
-    EmotionalState,
+    EmotionVector,
     PhysicalState,
 )
-from loom.schemas.event import EventCreate, EventLog, EventType
+from loom.schemas.event import EventCreate, EventLog, EventType, SnapshotMeta
 
 
 class TestEventLog:
@@ -111,19 +111,67 @@ class TestCharacterFrontmatter:
         with pytest.raises(ValidationError):
             CharacterFrontmatter(id="char_001", name="Alice", location="tower")
 
-    def test_emotional_state_defaults(self) -> None:
-        """测试情绪状态默认值。"""
-        emotional = EmotionalState()
-        assert emotional.grief == 0.0
-        assert emotional.joy == 0.0
+    def test_emotion_vector_defaults(self) -> None:
+        """测试 EmotionVector 核心维度默认值。"""
+        ev = EmotionVector()
+        assert ev.grief == 0.0
+        assert ev.joy == 0.0
+        assert ev.extras == {}
 
-    def test_emotional_state_range(self) -> None:
-        """测试情绪值范围校验。"""
+    def test_emotion_vector_range(self) -> None:
+        """测试核心维度值范围校验。"""
         with pytest.raises(ValidationError):
-            EmotionalState(grief=1.5)
+            EmotionVector(grief=1.5)
+
+    def test_emotion_vector_extras(self) -> None:
+        """测试自定义情绪维度。"""
+        ev = EmotionVector(
+            grief=0.3,
+            extras={"jealousy": 0.8, "hope": 0.6},
+        )
+        assert ev.extras["jealousy"] == 0.8
+        assert ev.extras["hope"] == 0.6
+
+    def test_emotion_vector_extras_validation(self) -> None:
+        """测试自定义情绪超范围校验。"""
+        with pytest.raises(ValidationError):
+            EmotionVector(grief=0.1, extras={"shame": 1.5})
 
     def test_physical_state_defaults(self) -> None:
         """测试物理状态默认值。"""
         physical = PhysicalState()
         assert physical.injuries == []
         assert physical.buffs == []
+
+
+class TestSnapshotMeta:
+    """SnapshotMeta 数据模型测试。"""
+
+    def test_delta_files_structure(self) -> None:
+        """测试文件级增量快照结构。"""
+        snapshot = SnapshotMeta(
+            snapshot_id="snap_ch_001_1698765432",
+            source_command="commit ch_001",
+            timestamp="2023-10-31T10:00:00",
+            delta_files={
+                "characters/char_001.md": {
+                    "fm_before": {"id": "char_001", "physical": []},
+                    "fm_after": {"id": "char_001", "physical": ["left_arm_fracture"]},
+                },
+            },
+            delta_sqlite={"event_ids_to_rollback": ["evt_001", "evt_002"]},
+        )
+        assert snapshot.snapshot_id == "snap_ch_001_1698765432"
+        assert snapshot.source_command == "commit ch_001"
+        assert "characters/char_001.md" in snapshot.delta_files
+        assert snapshot.delta_sqlite["event_ids_to_rollback"] == ["evt_001", "evt_002"]
+
+    def test_delta_files_defaults(self) -> None:
+        """测试快照默认值。"""
+        snapshot = SnapshotMeta(
+            snapshot_id="snap_ch_001",
+            source_command="commit ch_001",
+            timestamp="2023-10-31T10:00:00",
+        )
+        assert snapshot.delta_files == {}
+        assert snapshot.delta_sqlite == {"event_ids_to_rollback": []}
