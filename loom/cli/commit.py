@@ -30,7 +30,7 @@ def commit(
     """提取章节状态并固化，强制 Diff Review + 前置快照。"""
     from pathlib import Path
 
-    from loom.agents.auditor import Auditor
+    from loom.agents.auditor import Auditor, AuditorAbort
     from loom.storage.yaml_storage import YAMLStorage
     from loom.core.retriever import Retriever
 
@@ -69,15 +69,29 @@ def commit(
     llm_bus = LLMBus(model=model)
     retriever = Retriever(project_root)
     auditor = Auditor(
-        llm_bus=llm_bus, state_manager=manager, project_root=project_root
+        llm_bus=llm_bus,
+        state_manager=manager,
+        project_root=project_root,
+        yaml_storage=storage,
     )
 
-    events = auditor.extract_events(chapter_id, body, active_chars)
+    try:
+        result = auditor.extract_events_with_retry(
+            chapter_id, body, active_chars
+        )
+    except AuditorAbort:
+        rprint("[yellow]用户终止 commit[/yellow]")
+        return
 
-    if not events:
+    if result.dirty:
+        rprint("[bold yellow]脏提交：Auditor 提取失败，状态可能不一致[/bold yellow]")
+        return
+
+    if not result.events:
         rprint("[yellow]未检测到状态变更事件[/yellow]")
         return
 
+    events = result.events
     rprint(f"  [green]✓[/green] 提取到 {len(events)} 个事件\n")
 
     # Step 3: Diff 展示（铁律 3）
