@@ -1,5 +1,6 @@
 """llm 模块测试 - LLM 总线、响应提取。"""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from loom.core.llm import (
@@ -177,8 +178,6 @@ class TestLLMBusAchat:
     @patch("loom.core.llm.acompletion", new_callable=AsyncMock)
     def test_achat_basic(self, mock_acompletion: AsyncMock) -> None:
         """测试基本异步调用。"""
-        import asyncio
-
         mock_acompletion.return_value = MockResponse("异步回复")
         bus = LLMBus(model="gpt-4")
 
@@ -187,3 +186,74 @@ class TestLLMBusAchat:
 
         assert response.choices[0].message.content == "异步回复"
         mock_acompletion.assert_called_once()
+
+
+# ── LLMBus.achat_stream 测试 ──
+
+
+class TestLLMBusAchatStream:
+    """LLMBus.achat_stream 异步流式调用测试。"""
+
+    @patch("loom.core.llm.acompletion", new_callable=AsyncMock)
+    def test_achat_stream_yields_chunks(self, mock_acompletion: AsyncMock) -> None:
+        """测试流式调用逐块返回内容。"""
+
+        # 模拟流式 chunk 对象
+        class MockDelta:
+            def __init__(self, content: str | None) -> None:
+                self.content = content
+
+        class MockStreamChoice:
+            def __init__(self, content: str | None) -> None:
+                self.delta = MockDelta(content)
+
+        class MockStreamChunk:
+            def __init__(self, content: str | None) -> None:
+                self.choices = [MockStreamChoice(content)]
+
+        async def mock_stream():
+            yield MockStreamChunk("你好")
+            yield MockStreamChunk("世界")
+            yield MockStreamChunk(None)  # 空 chunk 应被跳过
+
+        mock_acompletion.return_value = mock_stream()
+        bus = LLMBus(model="gpt-4")
+
+        async def run():
+            chunks = []
+            async for chunk in bus.achat_stream([{"role": "user", "content": "测试"}]):
+                chunks.append(chunk)
+            return chunks
+
+        result = asyncio.run(run())
+        assert result == ["你好", "世界"]
+        mock_acompletion.assert_called_once()
+
+    @patch("loom.core.llm.acompletion", new_callable=AsyncMock)
+    def test_achat_stream_passes_parameters(self, mock_acompletion: AsyncMock) -> None:
+        """测试流式调用正确传递参数。"""
+
+        async def mock_stream():
+            return
+            yield  # make it an async generator
+
+        mock_acompletion.return_value = mock_stream()
+        bus = LLMBus(model="gpt-4")
+
+        async def run():
+            async for _ in bus.achat_stream(
+                [{"role": "user", "content": "测试"}],
+                model="deepseek-chat",
+                max_tokens=100,
+                temperature=0.2,
+            ):
+                pass
+
+        asyncio.run(run())
+        mock_acompletion.assert_called_once_with(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": "测试"}],
+            max_tokens=100,
+            temperature=0.2,
+            stream=True,
+        )
