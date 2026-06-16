@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **L.O.O.M. (Living Organic Outline Machine) V1.0.1** — 本地优先的长篇小说叙事操作系统。CLI 驱动，Markdown 创作，AI 辅助。
 
-> **当前状态**：设计冻结，Core 层骨架已搭建，检索/向量模块为 TODO 桩代码。所有代码必须遵循 `设计文档/` 中的 PRD 和技术方案。
+> **当前状态**：设计冻结，Core 层 + 语义层已实现，所有代码必须遵循 `设计文档/` 中的 PRD 和技术方案。
 
 ## 快速命令
 
@@ -39,7 +39,7 @@ loom --help                    # 查看所有命令
 |:---|:---|:---|
 | `loom init` | 初始化小说项目目录 | ✅ 完成 |
 | `loom write` | Actor 交互式写作循环 | ✅ 实现，依赖 LLM |
-| `loom stash` | 存入灵感潜意识池 | ✅ 实现，索引为 TODO |
+| `loom stash` | 存入灵感潜意识池 | ✅ 实现，向量索引已接入 |
 | `loom commit` | 提取状态并固化（强制快照+Diff审阅） | ✅ 实现 |
 | `loom rollback` | 回滚错误 commit | ✅ 实现 |
 | `loom diff` | 正文与 Shadow 一致性校验 | ✅ 实现（规则检测） |
@@ -50,7 +50,7 @@ loom --help                    # 查看所有命令
 ```
 Human Layer (创作层)          → 纯 Markdown 文件 (canon/ characters/ draft/)
 Machine Shadow (状态层)       → YAML Frontmatter + SQLite 事件账本 + Snapshots
-Semantic Layer (语义层)       → LlamaIndex + BGE-M3 向量索引 (TODO)
+Semantic Layer (语义层)       → LlamaIndex + BGE-M3 向量索引（可选 sentence-transformers）
 ```
 
 ### 四条防爆铁律
@@ -93,7 +93,7 @@ loom/
 ├── core/                    # 核心引擎
 │   ├── llm.py               # LLMBus: LiteLLM + tenacity 重试
 │   ├── context_assembler.py # TokenCounter + 权威分级上下文组装 + 熔断
-│   ├── retriever.py         # Retriever: LlamaIndex 路由 (TODO 桩代码)
+│   ├── retriever.py         # Retriever: 双索引语义检索路由 (canon + subconscious)
 │   ├── state_manager.py     # StateManager: 快照/回滚/Diff
 │   └── parser.py            # Markdown 场景切分 + Token 计数
 ├── agents/                  # 代理人格
@@ -102,7 +102,7 @@ loom/
 ├── storage/                 # 存储适配
 │   ├── sqlite.py            # EventStore: SQLModel 事件账本
 │   ├── yaml_storage.py      # YAMLStorage: Frontmatter 安全读写 + 原子写入
-│   └── vector.py            # VectorStore: BGE-M3 向量索引 (TODO 桩代码)
+│   └── vector.py            # VectorStore: LlamaIndex 向量索引（可选 BGE-M3 本地 embedding）
 ├── schemas/                 # Pydantic / SQLModel 模型
 │   ├── character.py         # CharacterFrontmatter, PhysicalState, EmotionVector
 │   └── event.py             # EventLog, EventCreate, EventDiff, SnapshotMeta
@@ -126,7 +126,7 @@ loom/
 ├── outlines/           # 大纲
 ├── subconscious/       # 灵感潜意识池 (SUBCONSCIOUS 层)
 ├── .snapshots/         # 文件级增量快照
-├── .index/             # 向量索引持久化 (TODO)
+├── .index/             # 向量索引持久化 (canon/ + subconscious/)
 ├── .loom.db            # SQLite 事件账本
 └── loom.yaml           # 项目配置 (model/token_budget)
 ```
@@ -165,9 +165,9 @@ loom/
 
 ## 已知 TODO / 桩代码
 
-- `core/retriever.py` — 全部检索方法返回空字符串（`query_canon`、`query_subconscious`）
-- `storage/vector.py` — 全部索引操作为注释代码
+- `core/context_assembler.py` — PANORAMIC 模式尚未注入历史章节正文（仅当前章）
 - BGE-M3 嵌入模型依赖 `sentence-transformers` (optional dependency `local-embedding`)
+- `networkx` 因果图与伏笔网（Phase 2 预留，未实现）
 
 ## 依赖管理
 
