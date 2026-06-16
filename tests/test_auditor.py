@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from loom.agents.auditor import Auditor, AuditorAbortError
-from loom.schemas.event import EventType
+from loom.schemas.event import EventCreate, EventType
 from loom.storage.yaml_storage import YAMLStorage
 
 # ── Mock LiteLLM 响应对象（属性访问模式）──
@@ -303,3 +303,184 @@ class TestRescueMode:
 
         meta, _ = storage.read_markdown_file(chapter_path)
         assert meta.get("dirty_flag") == "extraction_failed"
+
+    def test_rescue_skip_nonexistent_chapter(self, empty_project_root: Path) -> None:
+        """测试跳过不存在的章节文件时仍返回脏结果。"""
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+        )
+        result = auditor._rescue_skip("nonexistent_ch")
+        assert result.dirty is True
+        assert result.success is False
+
+
+class TestLoadPrompt:
+    """_load_prompt Prompt 加载测试。"""
+
+    def test_load_prompt_fallback_when_missing(self, empty_project_root: Path) -> None:
+        """测试 Prompt 文件不存在时返回默认文本。"""
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+            prompt_path=empty_project_root / "nonexistent.md",
+        )
+        prompt = auditor._load_prompt()
+        assert "叙事状态审计员" in prompt
+
+    def test_load_prompt_from_file(self, empty_project_root: Path) -> None:
+        """测试从文件加载 Prompt。"""
+        prompt_path = empty_project_root / "auditor.v1.md"
+        prompt_path.write_text("你是自定义审稿官。", encoding="utf-8")
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+            prompt_path=prompt_path,
+        )
+        prompt = auditor._load_prompt()
+        assert "自定义审稿官" in prompt
+
+
+class TestEmptyResponseRetry:
+    """LLM 返回空文本时的重试测试。"""
+
+    def test_empty_then_success(self, empty_project_root: Path, valid_json_response: str) -> None:
+        """测试第一次返回空文本后重试成功。"""
+        llm_bus = MockLLMBus(["", valid_json_response])
+        auditor = Auditor(
+            llm_bus=llm_bus,  # type: ignore[arg-type]
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+            prompt_path=empty_project_root / "prompts" / "auditor.v1.md",
+        )
+        result = auditor.extract_events_with_retry("ch_001", "正文")
+        assert result.success is True
+        assert len(result.events) == 1
+        assert llm_bus.call_count == 2
+
+    def test_all_empty_then_failed_result(self, empty_project_root: Path) -> None:
+        """测试连续返回空文本后返回失败结果（不触发 rescue mode）。"""
+        llm_bus = MockLLMBus(["", "", ""])
+        auditor = Auditor(
+            llm_bus=llm_bus,  # type: ignore[arg-type]
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+            prompt_path=empty_project_root / "prompts" / "auditor.v1.md",
+        )
+        result = auditor.extract_events_with_retry("ch_001", "正文")
+        # 空文本不触发 rescue mode，而是防御性返回失败结果
+        assert result.success is False
+        assert result.events == []
+        assert llm_bus.call_count == 3
+
+
+class TestGenerateDiffs:
+    """generate_diffs Diff 生成测试。"""
+
+    def test_generate_diffs_from_events(self, empty_project_root: Path) -> None:
+        """测试从事件列表生成 Diff 列表。"""
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+        )
+        events = [
+            EventCreate(
+                event_id="evt_001",
+                chapter_id="ch_001",
+                timestamp="第1天",
+                character_id="char_001",
+                event_type=EventType.INJURY,
+                description="受伤",
+                causal_pressure=0.8,
+            ),
+            EventCreate(
+                event_id="evt_002",
+                chapter_id="ch_001",
+                timestamp="第1天",
+                character_id="char_001",
+                event_type=EventType.HEAL,
+                description="治愈",
+                causal_pressure=0.5,
+            ),
+        ]
+        diffs = auditor.generate_diffs(events)
+        assert len(diffs) == 2
+        assert all(d.action == "add" for d in diffs)
+        assert diffs[0].event.event_id == "evt_001"
+        assert diffs[1].event.event_id == "evt_002"
+
+    def test_generate_diffs_empty_list(self, empty_project_root: Path) -> None:
+        """测试空事件列表生成空 Diff。"""
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+        )
+        diffs = auditor.generate_diffs([])
+        assert diffs == []
+
+
+class TestApplyConfirmedEvents:
+    """apply_confirmed_events 事件写入测试。"""
+
+    def test_apply_events_calls_state_manager(self, empty_project_root: Path) -> None:
+        """测试将确认事件写入状态管理器。"""
+        mock_sm = MagicMock()
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=mock_sm,
+            project_root=empty_project_root,
+        )
+        events = [
+            EventCreate(
+                event_id="evt_001",
+                chapter_id="ch_001",
+                timestamp="第1天",
+                character_id="char_001",
+                event_type=EventType.INJURY,
+                description="受伤",
+                causal_pressure=0.8,
+            ),
+        ]
+        event_ids = auditor.apply_confirmed_events(events, "ch_001")
+        assert event_ids == ["evt_001"]
+        mock_sm.apply_event.assert_called_once()
+
+    def test_apply_empty_events(self, empty_project_root: Path) -> None:
+        """测试空事件列表不调用状态管理器。"""
+        mock_sm = MagicMock()
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=mock_sm,
+            project_root=empty_project_root,
+        )
+        event_ids = auditor.apply_confirmed_events([], "ch_001")
+        assert event_ids == []
+        mock_sm.apply_event.assert_not_called()
+
+
+class TestActiveCharactersInPrompt:
+    """active_characters 信息注入测试。"""
+
+    def test_active_characters_included_in_messages(
+        self, empty_project_root: Path, valid_json_response: str
+    ) -> None:
+        """测试活跃角色 ID 被包含在发送给 LLM 的消息中。"""
+        llm_bus = MockLLMBus([valid_json_response])
+        auditor = Auditor(
+            llm_bus=llm_bus,  # type: ignore[arg-type]
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+            prompt_path=empty_project_root / "prompts" / "auditor.v1.md",
+        )
+        auditor.extract_events_with_retry(
+            "ch_001", "正文", active_characters=["char_001", "char_002"]
+        )
+        # 检查发送给 LLM 的消息中包含角色信息
+        user_msg = llm_bus.last_messages[1]["content"]
+        assert "char_001" in user_msg
+        assert "char_002" in user_msg
