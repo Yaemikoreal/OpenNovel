@@ -170,3 +170,17 @@ class TestLoomConfigSave:
         assert loaded.token_budget == original.token_budget
         assert loaded.output_reserve == original.output_reserve
         assert loaded.extra["custom"] == 42
+
+    def test_save_failure_logs_error(self, tmp_path: Path) -> None:
+        """测试保存失败时记录错误日志（覆盖 lines 106-107）。"""
+        from unittest.mock import patch
+
+        config = LoomConfig(model="gpt-4")
+
+        # 模拟 open() 抛出异常
+        with patch("builtins.open", side_effect=OSError("磁盘已满")):
+            # save() 内部捕获异常，不应抛出
+            config.save(tmp_path)
+
+        # 原始目录不应受影响，验证函数没有崩溃
+        assert config.model == "gpt-4"

@@ -1,6 +1,7 @@
 """YAMLStorage 模块测试 - Markdown/Frontmatter 读写与原子写入。"""
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -163,3 +164,50 @@ class TestExtractFunctions:
         value = storage.get_frontmatter_value(sample_md_file, "name")
         assert value == "Alice"
         assert storage.get_frontmatter_value(sample_md_file, "nonexistent") is None
+
+
+class TestAtomicWriteCleanup:
+    """原子写入异常清理路径测试。"""
+
+    def test_atomic_write_cleans_up_temp_on_failure(
+        self, storage: YAMLStorage, tmp_path: Path
+    ) -> None:
+        """写入过程中发生异常时应清理临时文件并重新抛出（覆盖 lines 75-78）。"""
+        file_path = tmp_path / "test_cleanup.md"
+        file_path.write_text("original content", encoding="utf-8")
+
+        # 记录写入前目录中的文件
+        files_before = set(tmp_path.iterdir())
+
+        # 模拟 os.replace 抛出异常，触发 except 分支
+        with (
+            patch("loom.storage.yaml_storage.os.replace", side_effect=OSError("模拟磁盘错误")),
+            pytest.raises(OSError, match="模拟磁盘错误"),
+        ):
+            storage.write_markdown_file(file_path, {"id": "test"}, "新内容")
+
+        # 验证临时文件已被清理（不应多出残留临时文件）
+        files_after = set(tmp_path.iterdir())
+        new_files = files_after - files_before
+        # 不应存在 .tmp_ 前缀的临时文件
+        tmp_files = [f for f in new_files if f.name.startswith(".tmp_")]
+        assert len(tmp_files) == 0, f"临时文件未被清理: {tmp_files}"
+
+        # 原文件内容应保持不变（未被覆盖）
+        assert file_path.read_text(encoding="utf-8") == "original content"
+
+    def test_atomic_write_no_temp_file_to_cleanup(
+        self, storage: YAMLStorage, tmp_path: Path
+    ) -> None:
+        """临时文件已不存在时清理分支应安全跳过（覆盖 line 76 的 False 分支）。"""
+        file_path = tmp_path / "test_no_tmp.md"
+
+        # 模拟 os.replace 失败，同时 os.path.exists 返回 False（临时文件已消失）
+        with (
+            patch("loom.storage.yaml_storage.os.replace", side_effect=OSError("错误")),
+            patch("loom.storage.yaml_storage.os.path.exists", return_value=False),
+            pytest.raises(OSError),
+        ):
+            storage.write_markdown_file(file_path, {"id": "test"}, "内容")
+
+        # 不应崩溃，安全跳过清理

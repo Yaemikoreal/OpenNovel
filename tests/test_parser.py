@@ -136,3 +136,47 @@ class TestCountTextTokensEdgeCases:
         text = "这是一段很长的文本。" * 1000
         count = count_text_tokens(text)
         assert count > 1000
+
+
+class TestSplitByBudgetEdgeCases:
+    """split_chapter_into_scenes 按 Token 预算切分的边界场景。"""
+
+    def test_single_line_exceeds_max_tokens(self) -> None:
+        """测试单行文本超过 max_tokens 时的切分行为。
+
+        覆盖 parser.py 第 66-68 行：当累积行的 token 超过 max_tokens
+        且 current_scene_lines 非空时，先将已有内容切分为一个场景。
+        """
+        # 用足够多的重复文本生成超过 max_tokens 的单行
+        long_line = "这是一段非常长的文本内容" * 50  # ~600+ tokens
+        text = f"短行\n{long_line}"
+        # max_tokens 设得很小，第一行放进去后，第二行必然超限
+        scenes = split_chapter_into_scenes(text, max_tokens=50)
+        # 应该切分出至少两个场景
+        assert len(scenes) >= 2
+
+    def test_budget_split_without_headings(self) -> None:
+        """测试无标题文本按 Token 预算切分。
+
+        多行文本累积超过 max_tokens，不依赖标题触发切分。
+        """
+        # 构建多行文本，每行 ~30 tokens，max_tokens=50 只能放 1 行
+        lines = [f"这是第{i}行的测试内容。" for i in range(10)]
+        text = "\n".join(lines)
+        scenes = split_chapter_into_scenes(text, max_tokens=50)
+        # 应切分为多个场景
+        assert len(scenes) >= 2
+        # 所有行都应出现在某个场景中
+        all_text = "\n".join(scenes)
+        for i in range(10):
+            assert f"第{i}行" in all_text
+
+    def test_single_line_exactly_at_max_tokens(self) -> None:
+        """测试单行恰好等于 max_tokens 时不切分。"""
+        # 构造恰好约 20 tokens 的文本
+        line = "hello world " * 5  # ~15 tokens
+        text = f"prefix\n{line}"
+        # 设置足够大的 max_tokens
+        total = count_text_tokens(text)
+        scenes = split_chapter_into_scenes(text, max_tokens=total)
+        assert len(scenes) == 1

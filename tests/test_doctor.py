@@ -290,3 +290,55 @@ class TestEdgeCases:
         # 空快照目录应有统计信息（INFO 级别）
         if snapshot_items:
             assert snapshot_items[0].level == DiagnosticLevel.INFO
+
+    def test_missing_snapshots_dir(self, tmp_path: Path) -> None:
+        """测试快照目录不存在时的处理（覆盖 lines 275-282）。"""
+        root = tmp_path / "no_snap"
+        root.mkdir()
+        (root / "characters").mkdir()
+        (root / "draft").mkdir()
+        # 故意不创建 .snapshots 目录
+
+        doctor = Doctor(root)
+        items = doctor.diagnose()
+
+        snapshot_items = [i for i in items if i.category == "snapshot_stats"]
+        assert len(snapshot_items) >= 1
+        assert snapshot_items[0].level == DiagnosticLevel.INFO
+        assert "不存在" in snapshot_items[0].message or "尚未" in snapshot_items[0].message
+
+    def test_corrupted_chapter_file_in_refs(self, project_root: Path) -> None:
+        """测试扫描章节引用时损坏文件被跳过（覆盖 lines 138-139）。"""
+        # 写入损坏的章节文件
+        bad_ch = project_root / "draft" / "ch_bad.md"
+        bad_ch.write_text("---\ninvalid: [yaml: broken\n---\n内容", encoding="utf-8")
+
+        doctor = Doctor(project_root)
+        items = doctor.diagnose()
+        # 不应崩溃，损坏文件被跳过
+        assert isinstance(items, list)
+
+    def test_corrupted_file_in_id_consistency(self, project_root: Path) -> None:
+        """测试 ID 一致性检测中损坏文件被跳过（覆盖 lines 227-228）。"""
+        # 写入损坏的角色文件
+        bad_char = project_root / "characters" / "char_corrupt.md"
+        bad_char.write_text("---\nbad: [yaml: broken\n---\n内容", encoding="utf-8")
+
+        doctor = Doctor(project_root)
+        items = doctor.diagnose()
+        # 不应崩溃
+        assert isinstance(items, list)
+
+    def test_event_store_read_failure(self, project_root: Path) -> None:
+        """测试事件账本读取失败时的处理（覆盖 lines 253-255）。"""
+        # 创建一个 .loom.db 文件，但内容为无效数据
+        db_path = project_root / ".loom.db"
+        db_path.write_bytes(b"not a valid sqlite database")
+
+        doctor = Doctor(project_root)
+        items = doctor.diagnose()
+        # 不应崩溃，事件账本读取失败被跳过
+        assert isinstance(items, list)
+        # 不应有 ledger_orphan 类型的诊断项
+        ledger_items = [i for i in items if i.category == "ledger_orphan"]
+        assert len(ledger_items) == 0

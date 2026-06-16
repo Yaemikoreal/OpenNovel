@@ -200,6 +200,70 @@ class TestRollbackSnapshot:
         success = manager.rollback_snapshot(snapshot.snapshot_id)
         assert success is True
 
+    def test_rollback_skips_missing_files(self, project_root: Path, storage: YAMLStorage) -> None:
+        """测试回滚时跳过不存在的文件（覆盖 lines 180-181）。"""
+        import orjson
+
+        manager = StateManager(project_root, yaml_storage=storage)
+
+        # 手动构造一个引用不存在文件的快照
+        snap_id = "snap_test_missing"
+        snap_data = {
+            "snapshot_id": snap_id,
+            "source_command": "commit ch_001",
+            "timestamp": "2024-01-01T00:00:00",
+            "delta_files": {
+                "characters/nonexistent.md": {
+                    "fm_before": {"id": "nonexistent", "name": "ghost"},
+                    "fm_after": {"id": "nonexistent", "name": "ghost_after"},
+                }
+            },
+            "delta_sqlite": {"event_ids_to_rollback": []},
+        }
+        snap_path = project_root / ".snapshots" / f"{snap_id}.snapshot.json"
+        snap_path.write_bytes(orjson.dumps(snap_data, option=orjson.OPT_INDENT_2))
+
+        # 回滚应成功但跳过不存在的文件
+        success = manager.rollback_snapshot(snap_id)
+        assert success is True
+
+    def test_rollback_force_restore_no_fm_after(
+        self, project_root: Path, storage: YAMLStorage
+    ) -> None:
+        """测试回滚时 fm_after 为 None 时直接强制恢复（覆盖 lines 199-201）。"""
+        import orjson
+
+        manager = StateManager(project_root, yaml_storage=storage)
+        char_path = project_root / "characters" / "char_001.md"
+
+        # 先修改角色名字
+        storage.update_frontmatter(char_path, {"name": "被改过的名字"})
+
+        # 手动构造一个 fm_after 为 None 的快照
+        snap_id = "snap_force_restore"
+        snap_data = {
+            "snapshot_id": snap_id,
+            "source_command": "commit ch_001",
+            "timestamp": "2024-01-01T00:00:00",
+            "delta_files": {
+                "characters/char_001.md": {
+                    "fm_before": {"id": "char_001", "name": "林夜"},
+                    "fm_after": None,
+                }
+            },
+            "delta_sqlite": {"event_ids_to_rollback": []},
+        }
+        snap_path = project_root / ".snapshots" / f"{snap_id}.snapshot.json"
+        snap_path.write_bytes(orjson.dumps(snap_data, option=orjson.OPT_INDENT_2))
+
+        # 回滚应强制恢复（无冲突检测）
+        success = manager.rollback_snapshot(snap_id)
+        assert success is True
+
+        # 验证角色名字恢复为快照中的 fm_before
+        restored_meta, _ = storage.read_markdown_file(char_path)
+        assert restored_meta["name"] == "林夜"
+
 
 class TestApplyCharacterDiff:
     """apply_character_diff 角色状态更新测试。"""
@@ -294,6 +358,36 @@ class TestGenerateDiffText:
         text = manager.generate_diff_text([])
         assert text == ""
 
+    def test_generate_modify_diff(self, project_root: Path) -> None:
+        """测试生成 modify 类型的 Diff（覆盖 lines 264-265）。"""
+        from loom.schemas.event import EventDiff
+
+        manager = StateManager(project_root)
+        event_before = EventCreate(
+            event_id="evt_003",
+            chapter_id="ch_001",
+            timestamp="第1天",
+            character_id="char_001",
+            event_type=EventType.INJURY,
+            description="左臂骨折",
+            causal_pressure=0.9,
+        )
+        event_after = EventCreate(
+            event_id="evt_003",
+            chapter_id="ch_001",
+            timestamp="第1天",
+            character_id="char_001",
+            event_type=EventType.HEAL,
+            description="左臂痊愈",
+            causal_pressure=0.3,
+        )
+        diffs = [EventDiff(action="modify", event=event_after, before=event_before)]
+        text = manager.generate_diff_text(diffs)
+
+        assert "~ [Event]" in text
+        assert "左臂骨折" in text
+        assert "左臂痊愈" in text
+
 
 class TestListSnapshots:
     """list_snapshots 快照列表测试。"""
@@ -320,6 +414,17 @@ class TestListSnapshots:
         assert len(snapshots) >= 1
         assert snapshots[0].snapshot_id.startswith("snap_ch_001_")
 
+    def test_list_snapshots_skips_corrupt_files(self, project_root: Path) -> None:
+        """测试 list_snapshots 跳过损坏的快照文件（覆盖 lines 284-285）。"""
+        snap_dir = project_root / ".snapshots"
+        # 写入一个损坏的快照文件
+        (snap_dir / "corrupt.snapshot.json").write_bytes(b"not valid json{{{")
+
+        manager = StateManager(project_root)
+        snapshots = manager.list_snapshots()
+        # 不应崩溃，损坏文件被跳过
+        assert isinstance(snapshots, list)
+
 
 class TestSerializeFrontmatter:
     """_serialize_frontmatter 序列化测试。"""
@@ -341,3 +446,31 @@ class TestSerializeFrontmatter:
         data = {"location": None}
         result = _serialize_frontmatter(data)
         assert result["location"] is None
+
+    def test_serialize_pydantic_model(self) -> None:
+        """测试 Pydantic 模型自动 model_dump 序列化。"""
+        char = CharacterFrontmatter(id="char_001", name="测试角色")
+        data = {"character": char}
+        result = _serialize_frontmatter(data)
+        assert result["character"]["id"] == "char_001"
+        assert result["character"]["name"] == "测试角色"
+
+    def test_serialize_non_serializable_fallback(self) -> None:
+        """测试不可序列化类型回退为 str()。"""
+
+        class CustomObj:
+            def __str__(self) -> str:
+                return "custom_value"
+
+        data = {"weird_field": CustomObj()}
+        result = _serialize_frontmatter(data)
+        assert result["weird_field"] == "custom_value"
+
+
+class TestYamlStorageProperty:
+    """yaml_storage 属性测试。"""
+
+    def test_yaml_storage_property(self, project_root: Path, storage: YAMLStorage) -> None:
+        """测试 yaml_storage 属性返回注入的实例。"""
+        manager = StateManager(project_root, yaml_storage=storage)
+        assert manager.yaml_storage is storage

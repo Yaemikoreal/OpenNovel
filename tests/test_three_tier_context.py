@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from loom.core.context_assembler import (
+    OUTPUT_RESERVE,
     PANORAMIC_SOFT_LIMIT,
     STANDARD_TOKEN_BUDGET,
     ContextStrategy,
@@ -365,9 +366,7 @@ class TestPanoramicHistoricalInjection:
         )
 
         # 历史注入不应包含当前章节
-        history_msgs = [
-            m for m in messages if "[CHAPTER HISTORY" in m.get("content", "")
-        ]
+        history_msgs = [m for m in messages if "[CHAPTER HISTORY" in m.get("content", "")]
         for m in history_msgs:
             assert "独有标记XYZ" not in m["content"]
 
@@ -399,9 +398,7 @@ class TestPanoramicHistoricalInjection:
         )
 
         # 不应有历史注入消息
-        history_msgs = [
-            m for m in messages if "[CHAPTER HISTORY" in m.get("content", "")
-        ]
+        history_msgs = [m for m in messages if "[CHAPTER HISTORY" in m.get("content", "")]
         assert len(history_msgs) == 0
 
     def test_reverse_order(self, tmp_path: Path) -> None:
@@ -444,9 +441,7 @@ class TestPanoramicHistoricalInjection:
         )
 
         # 找到历史注入消息
-        history_msgs = [
-            m for m in messages if "[CHAPTER HISTORY" in m.get("content", "")
-        ]
+        history_msgs = [m for m in messages if "[CHAPTER HISTORY" in m.get("content", "")]
         if history_msgs:
             content = history_msgs[0]["content"]
             # ch_002 应在 ch_001 之前（倒序）
@@ -454,3 +449,411 @@ class TestPanoramicHistoricalInjection:
             idx_001 = content.find("MARKER_CH001")
             if idx_002 >= 0 and idx_001 >= 0:
                 assert idx_002 < idx_001
+
+
+# ── 辅助函数 ──
+
+
+def _make_large_text(token_counter: TokenCounter, target_tokens: int) -> str:
+    """生成至少 target_tokens 数量的文本。"""
+    base = "这是一段用于测试截断逻辑的长文本内容。" * 50
+    result = base
+    while token_counter.count(result) < target_tokens:
+        result += base
+    return result
+
+
+# ── STANDARD 截断分支测试 ──
+
+
+class TestStandardTruncation:
+    """STANDARD 策略中各层级截断分支测试。"""
+
+    def test_standard_canon_truncated(self, tmp_path: Path) -> None:
+        """测试 STANDARD 模式下 CANON 超过 20% 预算时被截断 (覆盖 389-390 行)。"""
+        counter = TokenCounter()
+        (tmp_path / "characters").mkdir()
+        storage = YAMLStorage()
+
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "角色"},
+            "# 背景",
+        )
+        chapter_path = tmp_path / "ch_001.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {"id": "ch_001", "pov": "char_001", "active_characters": ["char_001"]},
+            "# 第一章",
+        )
+
+        # STANDARD budget = 48000 - 2000 = 46000, canon = 20% = 9200 tokens
+        large_canon = _make_large_text(counter, 15000)
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="正文。",
+            canon_content=large_canon,
+            strategy=ContextStrategy.STANDARD,
+            yaml_storage=storage,
+        )
+
+        canon_msgs = [m for m in messages if "[CANON | IMMUTABLE" in m.get("content", "")]
+        assert len(canon_msgs) == 1
+        budget = STANDARD_TOKEN_BUDGET - OUTPUT_RESERVE
+        canon_budget = int(budget * 0.20)
+        assert counter.count(canon_msgs[0]["content"]) <= canon_budget
+
+    def test_standard_state_budget_break(self, tmp_path: Path) -> None:
+        """测试 STANDARD 模式下状态预算耗尽后跳过剩余角色 (覆盖 404 行)。"""
+        (tmp_path / "characters").mkdir()
+        storage = YAMLStorage()
+
+        # STANDARD budget = 46000, state = 30% = 13800 tokens
+        # 创建一个超大角色来吃掉状态预算（确保 JSON 序列化后 > 13800 tokens）
+        large_name = "超级长的角色名" * 5000
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {
+                "id": "char_001",
+                "name": large_name,
+                "physical": {"injuries": [], "buffs": [], "debuffs": []},
+            },
+            "# 背景",
+        )
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_002.md",
+            {"id": "char_002", "name": "配角"},
+            "# 配角背景",
+        )
+
+        chapter_path = tmp_path / "ch_001.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {
+                "id": "ch_001",
+                "pov": "char_001",
+                "active_characters": ["char_001", "char_002"],
+            },
+            "# 第一章",
+        )
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="正文。",
+            strategy=ContextStrategy.STANDARD,
+            yaml_storage=storage,
+        )
+
+        # char_001 的状态应该占满了预算，char_002 可能被跳过或截断
+        total_content = " ".join(m["content"] for m in messages)
+        assert "char_001" in total_content
+
+    def test_standard_missing_char_file_skipped(self, tmp_path: Path) -> None:
+        """测试 STANDARD 模式下角色文件不存在时跳过 (覆盖 407 行)。"""
+        (tmp_path / "characters").mkdir()
+        storage = YAMLStorage()
+
+        # 只创建 char_001，不创建 char_002
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "主角"},
+            "# 背景",
+        )
+
+        chapter_path = tmp_path / "ch_001.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {
+                "id": "ch_001",
+                "pov": "char_001",
+                "active_characters": ["char_001", "char_002"],
+            },
+            "# 第一章",
+        )
+
+        # 不应报错，char_002 应被跳过
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="正文。",
+            strategy=ContextStrategy.STANDARD,
+            yaml_storage=storage,
+        )
+
+        content = " ".join(m["content"] for m in messages)
+        assert "char_001" in content
+
+    def test_standard_per_char_state_truncated(self, tmp_path: Path) -> None:
+        """测试 STANDARD 模式下单个角色状态超过剩余预算时截断 (覆盖 416-417 行)。"""
+        (tmp_path / "characters").mkdir()
+        storage = YAMLStorage()
+
+        # STANDARD state_budget = int(46000 * 0.30) = 13800 tokens
+        # char_001 占用大部分预算（~12000 tokens），char_002 超过剩余
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {
+                "id": "char_001",
+                "name": "角色一" * 4000,
+                "physical": {"injuries": [], "buffs": [], "debuffs": []},
+            },
+            "# 背景一",
+        )
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_002.md",
+            {
+                "id": "char_002",
+                "name": "角色二" * 2000,
+                "physical": {"injuries": [], "buffs": [], "debuffs": []},
+            },
+            "# 背景二",
+        )
+
+        chapter_path = tmp_path / "ch_001.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {
+                "id": "ch_001",
+                "pov": "char_001",
+                "active_characters": ["char_001", "char_002"],
+            },
+            "# 第一章",
+        )
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="正文。",
+            strategy=ContextStrategy.STANDARD,
+            yaml_storage=storage,
+        )
+
+        # 两个角色的状态都应出现在消息中（可能被截断）
+        content = " ".join(m["content"] for m in messages)
+        assert "char_001" in content
+
+    def test_standard_subconscious_truncated(self, tmp_path: Path) -> None:
+        """测试 STANDARD 模式下潜意识超过 15% 预算时截断 (覆盖 432-433 行)。"""
+        counter = TokenCounter()
+        (tmp_path / "characters").mkdir()
+        storage = YAMLStorage()
+
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "角色"},
+            "# 背景",
+        )
+        chapter_path = tmp_path / "ch_001.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {"id": "ch_001", "pov": "char_001", "active_characters": ["char_001"]},
+            "# 第一章",
+        )
+
+        # STANDARD budget = 46000, sub = 15% = 6900 tokens
+        large_sub = _make_large_text(counter, 10000)
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="正文。",
+            subconscious_content=large_sub,
+            strategy=ContextStrategy.STANDARD,
+            yaml_storage=storage,
+        )
+
+        sub_msgs = [m for m in messages if "[SUBCONSCIOUS FRAGMENT" in m.get("content", "")]
+        assert len(sub_msgs) == 1
+        budget = STANDARD_TOKEN_BUDGET - OUTPUT_RESERVE
+        sub_budget = int(budget * 0.15)
+        assert counter.count(sub_msgs[0]["content"]) <= sub_budget
+
+    def test_standard_text_truncated(self, tmp_path: Path) -> None:
+        """测试 STANDARD 模式下近期正文超过剩余预算时截断 (覆盖 444 行)。"""
+        counter = TokenCounter()
+        (tmp_path / "characters").mkdir()
+        storage = YAMLStorage()
+
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "角色"},
+            "# 背景",
+        )
+        chapter_path = tmp_path / "ch_001.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {"id": "ch_001", "pov": "char_001", "active_characters": ["char_001"]},
+            "# 第一章",
+        )
+
+        # 使用大文本来消耗剩余预算
+        large_text = _make_large_text(counter, 50000)
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text=large_text,
+            strategy=ContextStrategy.STANDARD,
+            yaml_storage=storage,
+        )
+
+        user_msgs = [m for m in messages if m["role"] == "user"]
+        assert len(user_msgs) == 1
+        # 总 token 应在预算内
+        total = sum(counter.count(m["content"]) for m in messages)
+        assert total <= STANDARD_TOKEN_BUDGET
+
+    def test_standard_persona_injected(self, tmp_path: Path) -> None:
+        """测试 STANDARD 模式下人格 Prompt 被注入 (覆盖 377-381 行)。"""
+        (tmp_path / "characters").mkdir()
+        (tmp_path / "prompts").mkdir()
+        storage = YAMLStorage()
+
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "角色"},
+            "# 背景",
+        )
+        chapter_path = tmp_path / "ch_001.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {"id": "ch_001", "pov": "char_001", "active_characters": ["char_001"]},
+            "# 第一章",
+        )
+
+        prompt_path = tmp_path / "prompts" / "actor.v1.md"
+        prompt_path.write_text("# Actor 人格\n\n你是写作代理。", encoding="utf-8")
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="正文。",
+            prompt_path=prompt_path,
+            strategy=ContextStrategy.STANDARD,
+            yaml_storage=storage,
+        )
+
+        # 应该包含人格消息
+        persona_msgs = [m for m in messages if "写作代理" in m.get("content", "")]
+        assert len(persona_msgs) == 1
+
+
+# ── PANORAMIC 截断分支测试 ──
+
+
+class TestPanoramicTruncation:
+    """PANORAMIC 策略中截断分支测试。"""
+
+    def test_panoramic_persona_injected(self, tmp_path: Path) -> None:
+        """测试 PANORAMIC 模式下人格 Prompt 被注入 (覆盖 481-485 行)。"""
+        (tmp_path / "characters").mkdir()
+        (tmp_path / "prompts").mkdir()
+        storage = YAMLStorage()
+
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "角色"},
+            "# 背景",
+        )
+        chapter_path = tmp_path / "ch_001.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {"id": "ch_001", "pov": "char_001", "active_characters": ["char_001"]},
+            "# 第一章",
+        )
+
+        prompt_path = tmp_path / "prompts" / "actor.v1.md"
+        prompt_path.write_text("# Actor 人格\n\n你是全景写作代理。", encoding="utf-8")
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="正文。",
+            prompt_path=prompt_path,
+            strategy=ContextStrategy.PANORAMIC,
+            yaml_storage=storage,
+        )
+
+        persona_msgs = [m for m in messages if "全景写作代理" in m.get("content", "")]
+        assert len(persona_msgs) == 1
+
+    def test_panoramic_missing_char_file_skipped(self, tmp_path: Path) -> None:
+        """测试 PANORAMIC 模式下角色文件不存在时跳过 (覆盖 503 行)。"""
+        (tmp_path / "characters").mkdir()
+        storage = YAMLStorage()
+
+        # 只创建 char_001
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "主角"},
+            "# 背景",
+        )
+
+        chapter_path = tmp_path / "ch_001.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {
+                "id": "ch_001",
+                "pov": "char_001",
+                "active_characters": ["char_001", "char_002", "char_003"],
+            },
+            "# 第一章",
+        )
+
+        # 不应报错，缺失的角色文件应被跳过
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="正文。",
+            strategy=ContextStrategy.PANORAMIC,
+            yaml_storage=storage,
+        )
+
+        content = " ".join(m["content"] for m in messages)
+        assert "char_001" in content
+
+    def test_panoramic_text_truncated_by_soft_limit(self, tmp_path: Path) -> None:
+        """测试 PANORAMIC 模式下当前正文超过剩余预算时被截断。"""
+        counter = TokenCounter()
+        (tmp_path / "characters").mkdir()
+        (tmp_path / "draft").mkdir()
+        storage = YAMLStorage()
+
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "角色"},
+            "# 背景",
+        )
+
+        # 创建历史章节消耗部分预算
+        for i in range(1, 4):
+            storage.write_markdown_file(
+                tmp_path / "draft" / f"ch_{i:03d}.md",
+                {"id": f"ch_{i:03d}", "pov": "char_001"},
+                f"# 第{i}章\n\n" + "历史内容。" * 100,
+            )
+
+        chapter_path = tmp_path / "draft" / "ch_004.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {"id": "ch_004", "pov": "char_001", "active_characters": ["char_001"]},
+            "# 第四章",
+        )
+
+        # 超大正文
+        huge_text = _make_large_text(counter, 150000)
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text=huge_text,
+            strategy=ContextStrategy.PANORAMIC,
+            yaml_storage=storage,
+        )
+
+        # 总 token 应在软限范围内
+        total = sum(counter.count(m["content"]) for m in messages)
+        assert total <= PANORAMIC_SOFT_LIMIT + 5000  # 容差

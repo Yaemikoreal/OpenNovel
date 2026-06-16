@@ -1,6 +1,7 @@
 """diff_checker 模块测试 - 正文与 Shadow 一致性校验。"""
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -217,3 +218,117 @@ class TestCheckAll:
         checker = DiffChecker(root)
         mismatches = checker.check_all()
         assert mismatches == []
+
+
+class TestErrorHandling:
+    """错误处理路径测试。"""
+
+    def test_check_chapter_nonexistent_file(self, tmp_path: Path) -> None:
+        """章节文件不存在时应返回 WARNING 消息（覆盖 line 110）。"""
+        root = tmp_path / "proj"
+        root.mkdir()
+        checker = DiffChecker(root)
+        nonexistent = root / "draft" / "missing.md"
+
+        mismatches = checker.check_chapter(nonexistent)
+
+        assert len(mismatches) == 1
+        assert mismatches[0].severity == Severity.WARNING
+        assert mismatches[0].category == "reference"
+        assert "不存在" in mismatches[0].message
+
+    def test_check_chapter_read_failure(self, project_root: Path, storage: YAMLStorage) -> None:
+        """读取章节文件失败时应返回 WARNING 消息（覆盖 lines 125-126）。"""
+        chapter_path = project_root / "draft" / "ch_read_err.md"
+        # 写入一个合法文件
+        storage.write_markdown_file(chapter_path, {"id": "ch_read_err"}, "# 内容")
+
+        checker = DiffChecker(project_root, yaml_storage=storage)
+
+        # 模拟 read_markdown_file 抛出 ValueError
+        with patch.object(storage, "read_markdown_file", side_effect=ValueError("YAML 格式损坏")):
+            mismatches = checker.check_chapter(chapter_path)
+
+        assert len(mismatches) == 1
+        assert mismatches[0].severity == Severity.WARNING
+        assert "读取章节失败" in mismatches[0].message
+
+    def test_check_all_no_draft_dir(self, tmp_path: Path) -> None:
+        """draft 目录不存在时 check_all 应返回空列表（覆盖 line 161）。"""
+        root = tmp_path / "proj_no_draft"
+        root.mkdir()
+        # 不创建 draft 目录
+
+        checker = DiffChecker(root)
+        mismatches = checker.check_all()
+
+        assert mismatches == []
+
+    def test_active_characters_with_non_string_items_in_reference_check(
+        self, project_root: Path, storage: YAMLStorage
+    ) -> None:
+        """active_characters 含非字符串元素时应安全跳过（覆盖 line 213）。"""
+        chapter_path = project_root / "draft" / "ch_mixed.md"
+        chapter_meta = {
+            "id": "ch_mixed",
+            "pov": "char_001",
+            "active_characters": ["char_001", 123, None, "char_002"],
+        }
+        storage.write_markdown_file(chapter_path, chapter_meta, "# 混合引用")
+
+        checker = DiffChecker(project_root, yaml_storage=storage)
+        mismatches = checker.check_chapter(chapter_path)
+
+        # 不应崩溃，非字符串项被跳过
+        assert isinstance(mismatches, list)
+
+    def test_active_characters_with_non_string_items_in_injury_check(
+        self, project_root: Path, storage: YAMLStorage
+    ) -> None:
+        """伤势检测中 active_characters 含非字符串元素时应安全跳过（覆盖 line 147）。"""
+        chapter_path = project_root / "draft" / "ch_injury_mixed.md"
+        chapter_meta = {
+            "id": "ch_injury_mixed",
+            "pov": "char_001",
+            "active_characters": ["char_001", 42, True],
+        }
+        storage.write_markdown_file(chapter_path, chapter_meta, "# 第一章\n\n林夜的左臂受伤了。")
+
+        checker = DiffChecker(project_root, yaml_storage=storage)
+        mismatches = checker.check_chapter(chapter_path)
+
+        # 不应崩溃，42 和 True 被跳过
+        assert isinstance(mismatches, list)
+        # char_001 的伤势检测应正常执行
+        injury_mismatches = [m for m in mismatches if m.category == "injury"]
+        assert all(m.character_id != "42" for m in injury_mismatches)
+
+    def test_injury_consistency_char_read_failure(
+        self, project_root: Path, storage: YAMLStorage
+    ) -> None:
+        """角色文件读取失败时伤势检测应安全返回空列表（覆盖 lines 243-244）。"""
+        chapter_path = project_root / "draft" / "ch_injury_err.md"
+        chapter_meta = {
+            "id": "ch_injury_err",
+            "pov": "char_001",
+            "active_characters": ["char_001"],
+        }
+        storage.write_markdown_file(chapter_path, chapter_meta, "# 第一章\n\n林夜痊愈了。")
+
+        checker = DiffChecker(project_root, yaml_storage=storage)
+
+        # 模拟 read_markdown_file 抛出 FileNotFoundError
+        original_read = storage.read_markdown_file
+
+        def mock_read(file_path: Path):
+            if "char_001" in str(file_path):
+                raise FileNotFoundError("角色文件损坏")
+            return original_read(file_path)
+
+        with patch.object(storage, "read_markdown_file", side_effect=mock_read):
+            mismatches = checker.check_chapter(chapter_path)
+
+        # 不应崩溃，伤势检测返回空
+        assert isinstance(mismatches, list)
+        injury_mismatches = [m for m in mismatches if m.category == "injury"]
+        assert len(injury_mismatches) == 0
