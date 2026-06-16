@@ -18,11 +18,13 @@ pip install -e ".[dev]"        # 安装项目 + 开发依赖
 pytest                         # 运行全部测试
 pytest -v --tb=short           # 详细输出
 pytest tests/test_parser.py    # 单文件测试
+pytest -k "test_name"          # 按名称过滤测试
 pytest --cov=loom --cov-report=term-missing  # 覆盖率
 
 # 代码质量
 ruff check loom/ tests/        # 静态检查
 ruff format loom/ tests/       # 格式化
+ruff format --check loom/ tests/  # 检查格式差异
 
 # 类型检查
 mypy loom/                     # 类型注解校验
@@ -40,13 +42,13 @@ loom --help                    # 查看所有命令
 | `loom stash` | 存入灵感潜意识池 | ✅ 实现，索引为 TODO |
 | `loom commit` | 提取状态并固化（强制快照+Diff审阅） | ✅ 实现 |
 | `loom rollback` | 回滚错误 commit | ✅ 实现 |
-| `loom diff` | 正文与 Shadow 一致性校验 | ⏳ 桩代码 |
-| `loom doctor` | 世界线健康度诊断 | ⏳ 桩代码 |
+| `loom diff` | 正文与 Shadow 一致性校验 | ✅ 实现（规则检测） |
+| `loom doctor` | 世界线健康度诊断 | ✅ 实现（基础检测） |
 
 ## 架构三层解耦
 
 ```
-Human Layer (创作层)          → 纯 Markdown 文件
+Human Layer (创作层)          → 纯 Markdown 文件 (canon/ characters/ draft/)
 Machine Shadow (状态层)       → YAML Frontmatter + SQLite 事件账本 + Snapshots
 Semantic Layer (语义层)       → LlamaIndex + BGE-M3 向量索引 (TODO)
 ```
@@ -57,6 +59,27 @@ Semantic Layer (语义层)       → LlamaIndex + BGE-M3 向量索引 (TODO)
 2. **权威分级** — `[CANON] > [STATE MEMORY] > [SUBCONSCIOUS]`，灵感不可作为设定执行
 3. **人工审核关口** — AI 只能提议，人类否决权（`loom commit` 的 Diff Review）
 4. **操作可逆** — 破坏性写入前必须生成 Snapshot，支持 `loom rollback`
+
+### 三级上下文策略
+
+`context_assembler.py` 根据模型上下文窗口自动映射策略（详见 `docs/adr/0002-three-tier-context-strategy.md`）：
+
+- **FRUGAL** (< 32K)：8K 预算，按比例分配各层级，仅注入 POV 角色状态
+- **STANDARD** (32K–128K)：48K 预算，注入全部活跃角色状态（`active_characters`），更多空间给设定和潜意识
+- **PANORAMIC** (> 128K)：128K 软限，全量设定 + 全量潜意识 + 全部活跃角色状态，不做截断
+
+使用方式：
+```python
+from loom.core.context_assembler import assemble_actor_context, ContextStrategy, detect_strategy
+
+# 自动检测策略
+strategy = detect_strategy(model_max_window)  # e.g. 128000 → STANDARD
+
+# 手动指定策略
+messages = assemble_actor_context(
+    chapter_path, project_root, current_text,
+    strategy=ContextStrategy.STANDARD,
+)
 
 ## 模块结构
 
@@ -72,48 +95,78 @@ loom/
 │   ├── context_assembler.py # TokenCounter + 权威分级上下文组装 + 熔断
 │   ├── retriever.py         # Retriever: LlamaIndex 路由 (TODO 桩代码)
 │   ├── state_manager.py     # StateManager: 快照/回滚/Diff
-│   └── parser.py            # Markdown + Frontmatter 读写隔离
+│   └── parser.py            # Markdown 场景切分 + Token 计数
 ├── agents/                  # 代理人格
 │   ├── actor.py             # Actor: 沉浸式续写
-│   └── auditor.py           # Auditor: 状态提取 + Pydantic 校验
+│   └── auditor.py           # Auditor: 状态提取 + Pydantic 校验 + 重试纠偏
 ├── storage/                 # 存储适配
 │   ├── sqlite.py            # EventStore: SQLModel 事件账本
+│   ├── yaml_storage.py      # YAMLStorage: Frontmatter 安全读写 + 原子写入
 │   └── vector.py            # VectorStore: BGE-M3 向量索引 (TODO 桩代码)
 ├── schemas/                 # Pydantic / SQLModel 模型
-│   ├── character.py         # CharacterFrontmatter, PhysicalState, EmotionalState
+│   ├── character.py         # CharacterFrontmatter, PhysicalState, EmotionVector
 │   └── event.py             # EventLog, EventCreate, EventDiff, SnapshotMeta
 └── prompts/                 # Prompt 即资产 (核心产品逻辑)
     ├── actor.v1.md          # Actor 人格 Prompt (冲突降级规则)
     └── auditor.v1.md        # Auditor 人格 Prompt (提取规则)
 ```
 
+### 项目初始化后的目录结构
+
+`loom init` 生成的标准小说项目：
+
+```
+<project>/
+├── canon/              # 不可变世界观设定 (CANON 层)
+│   └── world_rules.md
+├── characters/         # 角色档案 (Markdown + Frontmatter)
+│   └── char_001.md
+├── draft/              # 章节正文
+│   └── ch_001.md
+├── outlines/           # 大纲
+├── subconscious/       # 灵感潜意识池 (SUBCONSCIOUS 层)
+├── .snapshots/         # 文件级增量快照
+├── .index/             # 向量索引持久化 (TODO)
+├── .loom.db            # SQLite 事件账本
+└── loom.yaml           # 项目配置 (model/token_budget)
+```
+
 ## 关键代码模式
 
 ### Markdown + Frontmatter 双区隔离
 
-角色/章节文件 = Markdown 正文 + YAML Frontmatter。作者只写正文，AI 只写 Frontmatter，`python-frontmatter` 物理隔离读写。详见 `core/parser.py`。
+角色/章节文件 = Markdown 正文 + YAML Frontmatter。作者只写正文，AI 只写 Frontmatter，`python-frontmatter` 物理隔离读写。所有 Frontmatter 操作通过 `YAMLStorage` 进行，其他模块不得直接操作文件系统。详见 `storage/yaml_storage.py`。
+
+### 原子写入防损坏
+
+`YAMLStorage._atomic_write()` 使用 `tmpfile + os.replace()` 原子写入，防止断电/崩溃导致文件损坏。
+
+### safe_merge 冲突检测
+
+`YAMLStorage.safe_merge()` 在写入前比对文件当前 Frontmatter 与预期状态是否一致，不一致则抛出 `ConflictError`。回滚操作依赖此机制防止覆盖人类在间隙中的手动修改。
 
 ### Token 熔断机制
 
 `context_assembler.py` 中的 `assemble_actor_context()` 按权威分级注入上下文：
 - 人格注入 → CANON(20%) → STATE MEMORY(30%) → SUBCONSCIOUS(10%) → 近期正文(40%)
 - 总预算 8000 Tokens（预留 2000 输出）
-- 超限按权威层级从低到高截断
+- 超限按权威层级从低到高截断（SUBCONSCIOUS → STATE MEMORY → CANON）
 
 ### commit 5 步审阅流程
 
 `cli/commit.py` 的 `commit()`:
-1. 快照生成 (Snapshot) → 2. Auditor 提取事件 → 3. Diff 展示 → 4. 人工确认 → 5. 写入固化
+1. 快照生成 (Snapshot) → 2. Auditor 提取事件（含最多 3 次自省纠偏） → 3. Diff 展示 → 4. 人工确认 → 5. 写入固化
+
+若 Auditor 连续 3 次提取失败，进入人类急救模式（Rescue Mode）：[E]dit 手动修补 / [S]kip 脏提交（打 dirty_flag） / [A]bort 终止。
 
 ### 测试模式
 
-测试按模块分组，以 `TestClassName` 组织，使用 pytest fixture。数据库测试用 `tmp_path` 创建临时 SQLite 文件。示例见 `tests/test_parser.py` 和 `tests/test_storage.py`。
+测试按模块分组，以 `TestClassName` 组织，使用 pytest fixture。数据库测试用 `tmp_path` 创建临时 SQLite 文件。Mock 使用 `unittest.mock` 模拟 LLM 响应。示例见 `tests/test_parser.py`、`tests/test_auditor.py` 和 `tests/test_yaml_storage.py`。
 
 ## 已知 TODO / 桩代码
 
 - `core/retriever.py` — 全部检索方法返回空字符串（`query_canon`、`query_subconscious`）
 - `storage/vector.py` — 全部索引操作为注释代码
-- `cli/main.py:diff/doctor` — 仅打印占位文字
 - BGE-M3 嵌入模型依赖 `sentence-transformers` (optional dependency `local-embedding`)
 
 ## 依赖管理
@@ -126,7 +179,7 @@ python-frontmatter tiktoken orjson networkx
 
 ### 开发依赖
 ```
-pytest pytest-cov ruff mypy
+pytest pytest-cov ruff mypy pre-commit
 ```
 
 ### 可选依赖
@@ -134,8 +187,24 @@ pytest pytest-cov ruff mypy
 sentence-transformers  # 本地嵌入 (local-embedding)
 ```
 
+## Commit 约定
+
+使用中文，遵循 Conventional Commits 风格：
+
+```
+[类型]：精炼概要
+
+- 变更点：（做了什么改动）
+- 优化点：（改进了什么）
+- 解决问题：（修复了什么）
+```
+
+类型：`feat` `fix` `refactor` `test` `docs` `style` `chore`
+
 ## 设计文档
 
-详见 `设计文档/`：
-- `设计方案文档.md` — 技术架构方案
-- `设计需求文档.md` — 产品需求文档（已冻结）
+- `设计文档/设计方案文档.md` — 技术架构方案
+- `设计文档/设计需求文档.md` — 产品需求文档（已冻结）
+- `docs/adr/0001-file-level-incremental-snapshots.md` — 文件级增量快照决策
+- `docs/adr/0002-three-tier-context-strategy.md` — 三级上下文策略决策
+- `CONTEXT.md` — 项目术语表与命名约定（**必读**，定义了 CANON / STATE MEMORY / SUBCONSCIOUS 等核心术语的精确含义）

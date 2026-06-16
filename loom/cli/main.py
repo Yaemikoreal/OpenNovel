@@ -12,10 +12,13 @@
 
 import typer
 from rich import print as rprint
+from rich.console import Console
 
 from loom.cli.commit import commit_app
 from loom.cli.stash import stash_app
 from loom.cli.write import write_app
+
+console = Console()
 
 app = typer.Typer(
     name="loom",
@@ -150,22 +153,110 @@ def rollback(
 
 @app.command()
 def diff(
+    chapter: str = typer.Argument(None, help="章节文件路径（相对于 draft/），不指定则扫描全部"),
     path: str = typer.Argument(".", help="项目路径"),
 ) -> None:
     """检查正文与 Shadow 状态的一致性，暴露逻辑漏洞。"""
+    from pathlib import Path
 
-    rprint("[bold cyan]L.O.O.M. diff[/bold cyan] - 一致性校验")
-    rprint("[dim]功能开发中...[/dim]")
+    from rich.table import Table
+
+    from loom.core.diff_checker import DiffChecker, Severity
+
+    project_root = Path(path).resolve()
+    rprint("[bold cyan]L.O.O.M. diff[/bold cyan] - 一致性校验\n")
+
+    checker = DiffChecker(project_root)
+
+    if chapter:
+        chapter_path = project_root / "draft" / chapter
+        if not chapter_path.exists():
+            rprint(f"[bold red]章节文件不存在:[/bold red] {chapter_path}")
+            raise typer.Exit(1)
+        mismatches = checker.check_chapter(chapter_path)
+    else:
+        mismatches = checker.check_all()
+
+    if not mismatches:
+        rprint("[bold green]✓ 未检测到不一致[/bold green]")
+        return
+
+    # 渲染结果表格
+    table = Table(title=f"检测到 {len(mismatches)} 项不一致")
+    table.add_column("严重程度", style="bold", width=10)
+    table.add_column("类别", width=12)
+    table.add_column("角色", width=12)
+    table.add_column("描述")
+    table.add_column("来源", style="dim")
+
+    for m in mismatches:
+        severity_style = "red" if m.severity == Severity.WARNING else "yellow"
+        table.add_row(
+            f"[{severity_style}]{m.severity.value}[/{severity_style}]",
+            m.category,
+            m.character_id or "-",
+            m.message,
+            m.source,
+        )
+
+    console.print(table)
+
+    # 汇总
+    warnings = sum(1 for m in mismatches if m.severity == Severity.WARNING)
+    infos = sum(1 for m in mismatches if m.severity == Severity.INFO)
+    rprint(f"\n[dim]共 {warnings} 个 WARNING, {infos} 个 INFO[/dim]")
 
 
 @app.command()
 def doctor(
     path: str = typer.Argument(".", help="项目路径"),
 ) -> None:
-    """诊断世界线健康度（基础检测：孤立角色、时间线倒错）。"""
+    """诊断世界线健康度（基础检测：孤立角色、悬空引用、ID 一致性、脏标记）。"""
+    from pathlib import Path
 
-    rprint("[bold cyan]L.O.O.M. doctor[/bold cyan] - 世界线诊断")
-    rprint("[dim]功能开发中...[/dim]")
+    from rich.table import Table
+
+    from loom.core.doctor import DiagnosticLevel, Doctor
+
+    project_root = Path(path).resolve()
+    rprint("[bold cyan]L.O.O.M. doctor[/bold cyan] - 世界线诊断\n")
+
+    doc = Doctor(project_root)
+    items = doc.diagnose()
+
+    if not items:
+        rprint("[bold green]✓ 项目健康，未检测到问题[/bold green]")
+        return
+
+    # 渲染结果表格
+    table = Table(title=f"诊断完成，共 {len(items)} 项")
+    table.add_column("级别", style="bold", width=10)
+    table.add_column("类别", width=18)
+    table.add_column("描述")
+    table.add_column("详情", style="dim")
+
+    for item in items:
+        level_style = {
+            DiagnosticLevel.ERROR: "red",
+            DiagnosticLevel.WARNING: "yellow",
+            DiagnosticLevel.OK: "green",
+            DiagnosticLevel.INFO: "cyan",
+        }.get(item.level, "white")
+
+        table.add_row(
+            f"[{level_style}]{item.level.value}[/{level_style}]",
+            item.category,
+            item.message,
+            item.details,
+        )
+
+    console.print(table)
+
+    # 汇总
+    errors = sum(1 for i in items if i.level == DiagnosticLevel.ERROR)
+    warnings = sum(1 for i in items if i.level == DiagnosticLevel.WARNING)
+    oks = sum(1 for i in items if i.level in (DiagnosticLevel.OK, DiagnosticLevel.INFO))
+    rprint(f"\n[dim]共 {errors} 个 ERROR, {warnings} 个 WARNING, {oks} 个 OK/INFO[/dim]")
 
 
 if __name__ == "__main__":

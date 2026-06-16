@@ -39,7 +39,7 @@ def split_chapter_into_scenes(
     """
     try:
         encoding = tiktoken.get_encoding(encoding_model)
-    except KeyError:
+    except (KeyError, ValueError):
         logger.warning("未找到编码模型 %s，回退到 cl100k_base", encoding_model)
         encoding = tiktoken.get_encoding(_DEFAULT_ENCODING)
 
@@ -92,7 +92,7 @@ def count_text_tokens(
     """
     try:
         encoding = tiktoken.get_encoding(encoding_model)
-    except KeyError:
+    except (KeyError, ValueError):
         encoding = tiktoken.get_encoding(_DEFAULT_ENCODING)
     return len(encoding.encode(text))
 
@@ -114,7 +114,7 @@ def truncate_to_budget(
     """
     try:
         encoding = tiktoken.get_encoding(encoding_model)
-    except KeyError:
+    except (KeyError, ValueError):
         encoding = tiktoken.get_encoding(_DEFAULT_ENCODING)
 
     tokens = encoding.encode(text)
