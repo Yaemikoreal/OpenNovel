@@ -221,3 +221,72 @@ class TestNoIssues:
         # 但至少不应有 ERROR
         errors = [i for i in items if i.level == DiagnosticLevel.ERROR]
         assert len(errors) == 0
+
+
+class TestEdgeCases:
+    """边界情况测试。"""
+
+    def test_missing_characters_dir(self, tmp_path: Path) -> None:
+        """测试 characters 目录不存在时的处理。"""
+        root = tmp_path / "minimal"
+        root.mkdir()
+        (root / "draft").mkdir()
+        (root / ".snapshots").mkdir()
+        # 故意不创建 characters 目录
+
+        doctor = Doctor(root)
+        items = doctor.diagnose()
+        # 不应崩溃
+        assert isinstance(items, list)
+
+    def test_missing_draft_dir(self, tmp_path: Path) -> None:
+        """测试 draft 目录不存在时的处理。"""
+        root = tmp_path / "minimal"
+        root.mkdir()
+        (root / "characters").mkdir()
+        (root / ".snapshots").mkdir()
+
+        doctor = Doctor(root)
+        items = doctor.diagnose()
+        assert isinstance(items, list)
+
+    def test_corrupted_character_file(self, project_root: Path, storage: YAMLStorage) -> None:
+        """测试损坏的角色文件被跳过。"""
+        # 写入一个无效 YAML 的文件
+        bad_file = project_root / "characters" / "char_bad.md"
+        bad_file.write_text("---\ninvalid: [yaml: broken\n---\n内容", encoding="utf-8")
+
+        doctor = Doctor(project_root)
+        items = doctor.diagnose()
+        # 不应崩溃，损坏文件被跳过
+        assert isinstance(items, list)
+
+    def test_character_without_id(self, project_root: Path, storage: YAMLStorage) -> None:
+        """测试没有 id 字段的角色文件被跳过。"""
+        storage.write_markdown_file(
+            project_root / "characters" / "char_noid.md",
+            {"name": "无ID角色"},
+            "# 无ID角色\n\n内容",
+        )
+
+        doctor = Doctor(project_root)
+        items = doctor.diagnose()
+        # 无 id 的角色不应出现在孤立检测中
+        orphan_items = [i for i in items if i.category == "orphan_character"]
+        assert not any("无ID" in i.message for i in orphan_items)
+
+    def test_empty_snapshots_dir(self, tmp_path: Path) -> None:
+        """测试空快照目录。"""
+        root = tmp_path / "empty_snap"
+        root.mkdir()
+        (root / "characters").mkdir()
+        (root / "draft").mkdir()
+        (root / ".snapshots").mkdir()
+
+        doctor = Doctor(root)
+        items = doctor.diagnose()
+
+        snapshot_items = [i for i in items if i.category == "snapshot_stats"]
+        # 空快照目录应有统计信息（INFO 级别）
+        if snapshot_items:
+            assert snapshot_items[0].level == DiagnosticLevel.INFO

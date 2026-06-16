@@ -484,3 +484,85 @@ class TestActiveCharactersInPrompt:
         user_msg = llm_bus.last_messages[1]["content"]
         assert "char_001" in user_msg
         assert "char_002" in user_msg
+
+
+class TestRescueEdit:
+    """_rescue_edit 手动修补测试。"""
+
+    @patch("builtins.input", side_effect=["[]", "END"])
+    def test_rescue_edit_valid_json(self, mock_input: MagicMock, empty_project_root: Path) -> None:
+        """测试手动输入合法 JSON。"""
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+        )
+        result = auditor._rescue_edit("ch_001", "broken json")
+        assert result.success is True
+        assert result.events == []
+
+    @patch("builtins.input", side_effect=["{broken json}", "END"])
+    def test_rescue_edit_invalid_json(
+        self, mock_input: MagicMock, empty_project_root: Path
+    ) -> None:
+        """测试手动输入非法 JSON。"""
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+        )
+        result = auditor._rescue_edit("ch_001", "broken")
+        assert result.success is False
+
+    @patch("builtins.input", side_effect=[EOFError])
+    def test_rescue_edit_empty_input(self, mock_input: MagicMock, empty_project_root: Path) -> None:
+        """测试空输入取消编辑。"""
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+        )
+        result = auditor._rescue_edit("ch_001", "broken")
+        assert result.success is False
+        assert "取消" in (result.error or "") or result.events == []
+
+
+class TestTriggerRescueMode:
+    """_trigger_rescue_mode 急救模式触发测试。"""
+
+    @patch("rich.prompt.Prompt.ask", return_value="s")
+    def test_rescue_skip_choice(self, mock_prompt: MagicMock, empty_project_root: Path) -> None:
+        """测试选择 Skip 进入脏提交。"""
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+        )
+        result = auditor._trigger_rescue_mode("ch_001", "failed", "error")
+        assert result.dirty is True
+        assert result.success is False
+
+    @patch("rich.prompt.Prompt.ask", return_value="e")
+    @patch("builtins.input", side_effect=["[]", "END"])
+    def test_rescue_edit_choice(
+        self, mock_input: MagicMock, mock_prompt: MagicMock, empty_project_root: Path
+    ) -> None:
+        """测试选择 Edit 进入手动修补。"""
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+        )
+        result = auditor._trigger_rescue_mode("ch_001", "failed", "error")
+        assert result.success is True
+
+    @patch("rich.prompt.Prompt.ask", return_value="a")
+    def test_rescue_abort_choice(self, mock_prompt: MagicMock, empty_project_root: Path) -> None:
+        """测试选择 Abort 抛出异常。"""
+        auditor = Auditor(
+            llm_bus=MagicMock(),
+            state_manager=MagicMock(),
+            project_root=empty_project_root,
+        )
+        with pytest.raises(AuditorAbortError):
+            auditor._trigger_rescue_mode("ch_001", "failed", "error")

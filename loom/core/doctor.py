@@ -110,7 +110,7 @@ class Doctor:
                 char_id = meta.get("id")
                 if char_id and isinstance(char_id, str):
                     characters[char_id] = char_file
-            except (ValueError, FileNotFoundError) as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("读取角色文件失败: %s, %s", char_file, e)
 
         return characters
@@ -135,7 +135,7 @@ class Doctor:
                     for cid in active:
                         if isinstance(cid, str):
                             refs.add(cid)
-            except (ValueError, FileNotFoundError) as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("读取章节文件失败: %s, %s", chapter_file, e)
 
         return refs
@@ -190,7 +190,7 @@ class Doctor:
             for md_file in dir_path.glob("*.md"):
                 try:
                     meta, _ = self._yaml_storage.read_markdown_file(md_file)
-                except (ValueError, FileNotFoundError):
+                except Exception:  # noqa: BLE001
                     continue
 
                 frontmatter_id = meta.get("id")
@@ -224,7 +224,7 @@ class Doctor:
         for chapter_file in sorted(draft_dir.glob("*.md")):
             try:
                 meta, _ = self._yaml_storage.read_markdown_file(chapter_file)
-            except (ValueError, FileNotFoundError):
+            except Exception:  # noqa: BLE001
                 continue
 
             dirty_flag = meta.get("dirty_flag")
