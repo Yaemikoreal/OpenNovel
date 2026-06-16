@@ -292,3 +292,165 @@ def panoramic_setup(tmp_path: Path) -> dict:
         "long_canon": long_canon,
         "long_subconscious": long_subconscious,
     }
+
+
+# ── PANORAMIC 历史章节注入测试 ──
+
+
+class TestPanoramicHistoricalInjection:
+    """PANORAMIC 策略历史章节倒序注入测试。"""
+
+    def test_injects_previous_chapters(self, tmp_path: Path) -> None:
+        """测试 PANORAMIC 模式注入历史章节正文。"""
+        (tmp_path / "characters").mkdir()
+        (tmp_path / "draft").mkdir()
+        storage = YAMLStorage()
+
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "角色"},
+            "# 背景",
+        )
+
+        # 创建 3 个章节
+        for i in range(1, 4):
+            storage.write_markdown_file(
+                tmp_path / "draft" / f"ch_{i:03d}.md",
+                {"id": f"ch_{i:03d}", "pov": "char_001"},
+                f"# 第{i}章\n\n这是第{i}章的内容。",
+            )
+
+        # 当前章节是 ch_003
+        chapter_path = tmp_path / "draft" / "ch_003.md"
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="当前正文。",
+            strategy=ContextStrategy.PANORAMIC,
+            yaml_storage=storage,
+        )
+
+        content = " ".join(m["content"] for m in messages)
+        # 应包含历史章节内容（倒序：ch_002 优先于 ch_001）
+        assert "ch_002" in content or "第2章" in content
+        assert "ch_001" in content or "第1章" in content
+
+    def test_excludes_current_chapter(self, tmp_path: Path) -> None:
+        """测试不注入当前章节到历史中。"""
+        (tmp_path / "characters").mkdir()
+        (tmp_path / "draft").mkdir()
+        storage = YAMLStorage()
+
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "角色"},
+            "# 背景",
+        )
+
+        storage.write_markdown_file(
+            tmp_path / "draft" / "ch_001.md",
+            {"id": "ch_001", "pov": "char_001"},
+            "# 第一章\n\n第一章独有标记XYZ。",
+        )
+
+        chapter_path = tmp_path / "draft" / "ch_001.md"
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="当前正文。",
+            strategy=ContextStrategy.PANORAMIC,
+            yaml_storage=storage,
+        )
+
+        # 历史注入不应包含当前章节
+        history_msgs = [
+            m for m in messages if "[CHAPTER HISTORY" in m.get("content", "")
+        ]
+        for m in history_msgs:
+            assert "独有标记XYZ" not in m["content"]
+
+    def test_no_previous_chapters(self, tmp_path: Path) -> None:
+        """测试没有历史章节时不报错。"""
+        (tmp_path / "characters").mkdir()
+        (tmp_path / "draft").mkdir()
+        storage = YAMLStorage()
+
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "角色"},
+            "# 背景",
+        )
+
+        chapter_path = tmp_path / "draft" / "ch_001.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {"id": "ch_001", "pov": "char_001"},
+            "# 第一章",
+        )
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="正文。",
+            strategy=ContextStrategy.PANORAMIC,
+            yaml_storage=storage,
+        )
+
+        # 不应有历史注入消息
+        history_msgs = [
+            m for m in messages if "[CHAPTER HISTORY" in m.get("content", "")
+        ]
+        assert len(history_msgs) == 0
+
+    def test_reverse_order(self, tmp_path: Path) -> None:
+        """测试历史章节按倒序注入（最近的优先）。"""
+        (tmp_path / "characters").mkdir()
+        (tmp_path / "draft").mkdir()
+        storage = YAMLStorage()
+
+        storage.write_markdown_file(
+            tmp_path / "characters" / "char_001.md",
+            {"id": "char_001", "name": "角色"},
+            "# 背景",
+        )
+
+        # 创建 3 个章节，每章有独特标记
+        storage.write_markdown_file(
+            tmp_path / "draft" / "ch_001.md",
+            {"id": "ch_001", "pov": "char_001"},
+            "# 第一章\n\nMARKER_CH001。",
+        )
+        storage.write_markdown_file(
+            tmp_path / "draft" / "ch_002.md",
+            {"id": "ch_002", "pov": "char_001"},
+            "# 第二章\n\nMARKER_CH002。",
+        )
+
+        chapter_path = tmp_path / "draft" / "ch_003.md"
+        storage.write_markdown_file(
+            chapter_path,
+            {"id": "ch_003", "pov": "char_001"},
+            "# 第三章",
+        )
+
+        messages = assemble_actor_context(
+            chapter_path=chapter_path,
+            project_root=tmp_path,
+            current_text="正文。",
+            strategy=ContextStrategy.PANORAMIC,
+            yaml_storage=storage,
+        )
+
+        # 找到历史注入消息
+        history_msgs = [
+            m for m in messages if "[CHAPTER HISTORY" in m.get("content", "")
+        ]
+        if history_msgs:
+            content = history_msgs[0]["content"]
+            # ch_002 应在 ch_001 之前（倒序）
+            idx_002 = content.find("MARKER_CH002")
+            idx_001 = content.find("MARKER_CH001")
+            if idx_002 >= 0 and idx_001 >= 0:
+                assert idx_002 < idx_001

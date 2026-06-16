@@ -4,7 +4,7 @@
 
 - FRUGAL (<32K): 8K 预算，RAG + 摘要，精打细算
 - STANDARD (32K-128K): 48K 预算，当前章全量 + 全部活跃角色状态
-- PANORAMIC (>128K): 128K 软限，全量设定 + 全量潜意识 + 近期章节
+- PANORAMIC (>128K): 128K 软限，全量设定 + 全量潜意识 + 历史章节倒序注入
 
 详见 docs/adr/0002-three-tier-context-strategy.md。
 """
@@ -15,6 +15,7 @@ from pathlib import Path
 
 import tiktoken
 
+from loom.core.parser import split_chapter_into_scenes
 from loom.schemas.character import AuthorityLevel
 from loom.storage.yaml_storage import YAMLStorage
 
@@ -522,7 +523,22 @@ def _assemble_panoramic(
         messages.append(msg)
         total_tokens += sub_tokens
 
-    # 5. 近期正文 — 使用剩余预算
+    # 5. 历史章节倒序注入 — PANORAMIC 独有
+    remaining_budget = budget - total_tokens
+    if remaining_budget > 0:
+        history_text = _load_previous_chapters(
+            chapter_path, project_root, counter, remaining_budget
+        )
+        if history_text:
+            msg = ContextMessage(
+                role="system",
+                content=f"[CHAPTER HISTORY | REVERSE ORDER]\n{history_text}",
+            )
+            msg.token_count = counter.count(history_text)
+            messages.append(msg)
+            total_tokens += msg.token_count
+
+    # 6. 当前正文 — 使用剩余预算
     remaining_budget = budget - total_tokens
     if remaining_budget > 0 and current_text:
         text_tokens = counter.count(current_text)
@@ -570,6 +586,76 @@ def _extract_active_characters(chapter_path: Path, storage: YAMLStorage) -> list
             result.append(cid)
 
     return result
+
+
+def _load_previous_chapters(
+    current_chapter_path: Path,
+    project_root: Path,
+    counter: TokenCounter,
+    budget: int,
+) -> str:
+    """加载历史章节正文，按倒序注入（最近的章节优先）。
+
+    扫描 draft/ 目录下所有 .md 文件，排除当前章节，
+    使用 split_chapter_into_scenes() 切分后按倒序拼接。
+
+    Args:
+        current_chapter_path: 当前章节路径（排除）
+        project_root: 项目根目录
+        counter: Token 计数器
+        budget: 可用 Token 预算
+
+    Returns:
+        拼接后的历史文本（倒序），超预算时截断
+    """
+    draft_dir = project_root / "draft"
+    if not draft_dir.exists():
+        return ""
+
+    # 扫描所有章节文件，按文件名排序
+    chapter_files = sorted(draft_dir.glob("*.md"))
+    # 排除当前章节
+    chapter_files = [f for f in chapter_files if f != current_chapter_path]
+
+    if not chapter_files:
+        return ""
+
+    # 倒序读取（最近的章节优先）
+    history_parts: list[str] = []
+    total_tokens = 0
+
+    for chapter_file in reversed(chapter_files):
+        try:
+            body = chapter_file.read_text(encoding="utf-8")
+            # 跳过 Frontmatter，只取正文
+            if body.startswith("---"):
+                parts = body.split("---", 2)
+                if len(parts) >= 3:
+                    body = parts[2].strip()
+        except Exception:
+            continue
+
+        if not body:
+            continue
+
+        # 切分场景
+        scenes = split_chapter_into_scenes(body, max_tokens=2000)
+        chapter_text = "\n\n".join(scenes)
+
+        # 检查预算
+        chapter_tokens = counter.count(chapter_text)
+        if total_tokens + chapter_tokens > budget:
+            # 截断到剩余预算
+            remaining = budget - total_tokens
+            if remaining > 0:
+                chapter_text = counter.truncate_to_budget(chapter_text, remaining)
+                history_parts.append(f"[{chapter_file.stem}]\n{chapter_text}")
+            break
+
+        history_parts.append(f"[{chapter_file.stem}]\n{chapter_text}")
+        total_tokens += chapter_tokens
+
+    return "\n\n".join(history_parts)
 
 
 def _apply_circuit_breaker(

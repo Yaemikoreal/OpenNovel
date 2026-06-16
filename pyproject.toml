@@ -39,7 +39,6 @@ dependencies = [
     "python-frontmatter>=1.0.0",
     "tiktoken>=0.5.0",
     "orjson>=3.9.0",
-    "networkx>=3.1",
 ]
 
 [project.urls]
@@ -58,6 +57,9 @@ dev = [
 ]
 local-embedding = [
     "sentence-transformers>=2.2.0",
+]
+phase2 = [
+    "networkx>=3.1",
 ]
 
 [project.scripts]
