@@ -22,6 +22,10 @@ class EventStore:
 
     所有事件通过 Canonical ID 关联角色/地点/物品，
     支持跨章节溯源和 Phase 2 的因果推演。
+
+    使用方式:
+        with EventStore(db_path) as store:
+            store.add_event(event)
     """
 
     def __init__(self, db_path: Path) -> None:
@@ -33,6 +37,16 @@ class EventStore:
         self.db_path = db_path
         self._engine = create_engine(f"sqlite:///{db_path}", echo=False)
         self._create_tables()
+
+    def close(self) -> None:
+        """关闭数据库引擎，释放连接。"""
+        self._engine.dispose()
+
+    def __enter__(self) -> "EventStore":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
 
     def _create_tables(self) -> None:
         """创建数据库表结构。"""

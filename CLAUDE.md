@@ -165,21 +165,27 @@ loom/
 
 ## 已知 TODO / 桩代码
 
-- `core/context_assembler.py` — PANORAMIC 模式尚未注入历史章节正文（仅当前章）
+- `core/context_assembler.py` — PANORAMIC 模式已注入历史章节正文（`_load_previous_chapters()`）
 - BGE-M3 嵌入模型依赖 `sentence-transformers` (optional dependency `local-embedding`)
-- `networkx` 因果图与伏笔网（Phase 2 预留，未实现）
+- `networkx` 因果图与伏笔网（Phase 2 预留，未实现，已移至可选依赖 `phase2`）
 
 ## 依赖管理
 
 ### 主依赖
 ```
 typer rich litellm tenacity llama-index pydantic sqlmodel
-python-frontmatter tiktoken orjson networkx
+python-frontmatter tiktoken orjson
 ```
 
 ### 开发依赖
 ```
 pytest pytest-cov ruff mypy pre-commit
+```
+
+### 可选依赖
+```
+sentence-transformers  # 本地嵌入 (local-embedding)
+networkx              # 因果图 (phase2)
 ```
 
 ### 可选依赖

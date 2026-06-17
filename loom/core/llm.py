@@ -21,9 +21,11 @@ from tenacity import (
 
 logger = logging.getLogger(__name__)
 
-# LiteLLM 可重试的异常类型
+# LiteLLM 可重试的异常类型（仅网络/限流/超时类异常）
 RETRYABLE_EXCEPTIONS = (
-    Exception,  # LiteLLM 的网络/超时异常统一包装
+    ConnectionError,
+    TimeoutError,
+    OSError,
 )
 
 

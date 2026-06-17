@@ -159,7 +159,7 @@ class TestLLMBusChat:
     @patch("loom.core.llm.completion")
     def test_chat_retry_on_failure(self, mock_completion: MagicMock) -> None:
         """测试失败重试。"""
-        mock_completion.side_effect = [Exception("网络错误"), MockResponse("重试成功")]
+        mock_completion.side_effect = [ConnectionError("网络错误"), MockResponse("重试成功")]
         bus = LLMBus(model="gpt-4")
 
         messages = [{"role": "user", "content": "测试"}]
