@@ -10,6 +10,10 @@
 - loom doctor  : 诊断世界线健康度
 """
 
+import sys
+
+sys.stdout.reconfigure(encoding="utf-8")  # noqa: E402
+
 import typer
 from rich import print as rprint
 from rich.console import Console

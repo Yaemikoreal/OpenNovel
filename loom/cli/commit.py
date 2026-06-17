@@ -8,6 +8,9 @@
 铁律 4：任何破坏性写入前必须生成 Snapshot。
 """
 
+import sys
+sys.stdout.reconfigure(encoding="utf-8")
+
 import typer
 from rich import print as rprint
 from rich.console import Console

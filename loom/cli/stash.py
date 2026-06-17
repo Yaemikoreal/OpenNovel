@@ -6,6 +6,9 @@
 - 触发后台增量向量化索引
 """
 
+import sys
+sys.stdout.reconfigure(encoding="utf-8")
+
 import typer
 from rich import print as rprint
 

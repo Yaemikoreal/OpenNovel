@@ -7,6 +7,9 @@
 - 上下文权威分级注入 + Token 熔断
 """
 
+import sys
+sys.stdout.reconfigure(encoding="utf-8")
+
 import typer
 from rich import print as rprint
 from rich.console import Console
