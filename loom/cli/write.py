@@ -46,7 +46,13 @@ def write(
     rprint("[dim]输入空行触发续写，输入 :q 退出[/dim]\n")
 
     # 初始化组件
-    llm_bus = LLMBus(model=model)
+    from loom.core.config import LoomConfig
+    config = LoomConfig.load(project_root)
+    llm_bus = LLMBus(
+        model=model or config.model,
+        api_base=config.api_base,
+        api_key=config.api_key,
+    )
     retriever = Retriever(project_root)
     actor = Actor(llm_bus=llm_bus, retriever=retriever, project_root=project_root)
     storage = YAMLStorage()

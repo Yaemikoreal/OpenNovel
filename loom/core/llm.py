@@ -43,6 +43,8 @@ class LLMBus:
         default_max_tokens: int = 2000,
         default_temperature: float = 0.7,
         max_retries: int = 3,
+        api_base: str | None = None,
+        api_key: str | None = None,
     ) -> None:
         """初始化 LLM 总线。
 
@@ -51,11 +53,15 @@ class LLMBus:
             default_max_tokens: 默认最大输出 Token 数
             default_temperature: 默认生成温度
             max_retries: 最大重试次数
+            api_base: 自定义 API 端点（用于 OpenAI 兼容接口）
+            api_key: API 密钥（优先级高于环境变量）
         """
         self.model = model
         self.default_max_tokens = default_max_tokens
         self.default_temperature = default_temperature
         self.max_retries = max_retries
+        self.api_base = api_base
+        self.api_key = api_key
 
     @retry(
         retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
@@ -83,13 +89,19 @@ class LLMBus:
         Returns:
             LiteLLM 的原始响应字典
         """
-        response = completion(
-            model=model or self.model,
-            messages=messages,
-            max_tokens=max_tokens or self.default_max_tokens,
-            temperature=temperature or self.default_temperature,
-            **kwargs,
-        )
+        call_kwargs: dict[str, Any] = {
+            "model": model or self.model,
+            "messages": messages,
+            "max_tokens": max_tokens or self.default_max_tokens,
+            "temperature": temperature or self.default_temperature,
+        }
+        if self.api_base:
+            call_kwargs["api_base"] = self.api_base
+        if self.api_key:
+            call_kwargs["api_key"] = self.api_key
+        call_kwargs.update(kwargs)
+
+        response = completion(**call_kwargs)
         logger.debug(
             "LLM 调用完成: model=%s, usage=%s",
             model or self.model,
@@ -123,13 +135,19 @@ class LLMBus:
         Returns:
             LiteLLM 的原始响应字典
         """
-        response = await acompletion(
-            model=model or self.model,
-            messages=messages,
-            max_tokens=max_tokens or self.default_max_tokens,
-            temperature=temperature or self.default_temperature,
-            **kwargs,
-        )
+        call_kwargs: dict[str, Any] = {
+            "model": model or self.model,
+            "messages": messages,
+            "max_tokens": max_tokens or self.default_max_tokens,
+            "temperature": temperature or self.default_temperature,
+        }
+        if self.api_base:
+            call_kwargs["api_base"] = self.api_base
+        if self.api_key:
+            call_kwargs["api_key"] = self.api_key
+        call_kwargs.update(kwargs)
+
+        response = await acompletion(**call_kwargs)
         return response
 
     async def achat_stream(
@@ -154,14 +172,20 @@ class LLMBus:
         Yields:
             逐个生成的文本片段
         """
-        response = await acompletion(
-            model=model or self.model,
-            messages=messages,
-            max_tokens=max_tokens or self.default_max_tokens,
-            temperature=temperature or self.default_temperature,
-            stream=True,
-            **kwargs,
-        )
+        call_kwargs: dict[str, Any] = {
+            "model": model or self.model,
+            "messages": messages,
+            "max_tokens": max_tokens or self.default_max_tokens,
+            "temperature": temperature or self.default_temperature,
+            "stream": True,
+        }
+        if self.api_base:
+            call_kwargs["api_base"] = self.api_base
+        if self.api_key:
+            call_kwargs["api_key"] = self.api_key
+        call_kwargs.update(kwargs)
+
+        response = await acompletion(**call_kwargs)
         async for chunk in response:
             content = chunk.choices[0].delta.content
             if content:

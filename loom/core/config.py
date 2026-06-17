@@ -35,6 +35,8 @@ class LoomConfig:
         model: 默认 LLM 模型名称
         token_budget: Token 总预算
         output_reserve: 输出预留 Token 数
+        api_base: 自定义 API 端点（用于 OpenAI 兼容接口）
+        api_key: API 密钥（优先级高于环境变量）
         extra: 其他自定义配置
     """
 
@@ -42,6 +44,8 @@ class LoomConfig:
     model: str = DEFAULT_MODEL
     token_budget: int = DEFAULT_TOKEN_BUDGET
     output_reserve: int = DEFAULT_OUTPUT_RESERVE
+    api_base: str | None = None
+    api_key: str | None = None
     extra: dict = field(default_factory=dict)
 
     @property
@@ -74,7 +78,7 @@ class LoomConfig:
             return cls()
 
         # 提取已知字段，其余放入 extra
-        known_keys = {"version", "model", "token_budget", "output_reserve"}
+        known_keys = {"version", "model", "token_budget", "output_reserve", "api_base", "api_key"}
         extra = {k: v for k, v in data.items() if k not in known_keys}
 
         return cls(
@@ -82,6 +86,8 @@ class LoomConfig:
             model=str(data.get("model", DEFAULT_MODEL)),
             token_budget=int(data.get("token_budget", DEFAULT_TOKEN_BUDGET)),
             output_reserve=int(data.get("output_reserve", DEFAULT_OUTPUT_RESERVE)),
+            api_base=data.get("api_base"),
+            api_key=data.get("api_key"),
             extra=extra,
         )
 

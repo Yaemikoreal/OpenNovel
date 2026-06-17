@@ -68,7 +68,13 @@ def commit(
 
     # Step 2: Auditor 提取事件
     rprint("[bold]Step 2/5[/bold] Auditor 提取事件...")
-    llm_bus = LLMBus(model=model)
+    from loom.core.config import LoomConfig
+    config = LoomConfig.load(project_root)
+    llm_bus = LLMBus(
+        model=model or config.model,
+        api_base=config.api_base,
+        api_key=config.api_key,
+    )
     auditor = Auditor(
         llm_bus=llm_bus,
         state_manager=manager,

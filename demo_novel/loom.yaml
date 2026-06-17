@@ -1,4 +1,6 @@
-model: gpt-4
-output_reserve: 2000
-token_budget: 8000
+model: openai/mimo-v2.5-pro
+output_reserve: 4000
+token_budget: 50000
+api_base: https://token-plan-cn.xiaomimimo.com/v1
+api_key: tp-c4pa9gaom4ejvrpwgv5y7n03rmjj8d0wwp0hygnxc6rr731s
 version: 1.0.1
