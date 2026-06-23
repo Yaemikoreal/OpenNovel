@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **L.O.O.M. (Living Organic Outline Machine) V1.0.1** — 本地优先的长篇小说叙事操作系统。CLI 驱动，Markdown 创作，AI 辅助。
 
-> **当前状态**：设计冻结，Core 层 + 语义层已实现，所有代码必须遵循 `设计文档/` 中的 PRD 和技术方案。
+> **当前状态**：设计冻结，Core 层 + 语义层 + 三 Agent 自主创作系统已实现。
 
 ## 快速命令
 
@@ -80,6 +80,7 @@ messages = assemble_actor_context(
     chapter_path, project_root, current_text,
     strategy=ContextStrategy.STANDARD,
 )
+```
 
 ## 模块结构
 
@@ -95,7 +96,10 @@ loom/
 │   ├── context_assembler.py # TokenCounter + 权威分级上下文组装 + 熔断
 │   ├── retriever.py         # Retriever: 双索引语义检索路由 (canon + subconscious)
 │   ├── state_manager.py     # StateManager: 快照/回滚/Diff
-│   └── parser.py            # Markdown 场景切分 + Token 计数
+│   ├── parser.py            # Markdown 场景切分 + Token 计数
+│   ├── config.py            # 项目配置管理 (loom.yaml 读写)
+│   ├── diff_checker.py      # 正文与 Shadow 一致性校验
+│   └── doctor.py            # 世界线健康度诊断
 ├── agents/                  # 代理人格
 │   ├── actor.py             # Actor: 沉浸式续写
 │   └── auditor.py           # Auditor: 状态提取 + Pydantic 校验 + 重试纠偏
@@ -188,11 +192,6 @@ sentence-transformers  # 本地嵌入 (local-embedding)
 networkx              # 因果图 (phase2)
 ```
 
-### 可选依赖
-```
-sentence-transformers  # 本地嵌入 (local-embedding)
-```
-
 ## Commit 约定
 
 使用中文，遵循 Conventional Commits 风格：
@@ -209,8 +208,21 @@ sentence-transformers  # 本地嵌入 (local-embedding)
 
 ## 设计文档
 
-- `设计文档/设计方案文档.md` — 技术架构方案
-- `设计文档/设计需求文档.md` — 产品需求文档（已冻结）
 - `docs/adr/0001-file-level-incremental-snapshots.md` — 文件级增量快照决策
 - `docs/adr/0002-three-tier-context-strategy.md` — 三级上下文策略决策
 - `CONTEXT.md` — 项目术语表与命名约定（**必读**，定义了 CANON / STATE MEMORY / SUBCONSCIOUS 等核心术语的精确含义）
+- `docs/user-guide.md` — 用户手册（安装、工作流、FAQ）
+
+## 开发约束
+
+- **Python**: >= 3.10（pyproject.toml 声明 3.10/3.11/3.12）
+- **行宽**: 100 字符（ruff line-length）
+- **缩进**: 4 空格（.editorconfig）
+- **类型检查**: mypy strict 模式（`disallow_untyped_defs = true`）— 所有函数必须有类型注解
+- **Lint 规则**: ruff select E/F/W/I/N/UP/B/A/SIM，ignore B008（Typer 默认参数）
+- **Pre-commit**: ruff lint+format、mypy、trailing-whitespace、end-of-file-fixer、check-yaml、check-toml、大文件检查（500KB 限制）
+- **行尾**: LF（.editorconfig 强制）
+
+## demo_novel 项目
+
+`demo_novel/` 包含一个可运行的演示小说项目，`loom.yaml` 配置了 `openai/mimo-v2.5-pro` 模型和 50K token 预算。可用于测试 `loom write` / `loom commit` 等命令的完整流程。

@@ -64,3 +64,7 @@ Desktop.ini
 # Project generated
 output/
 novels/
+test_novel/
+
+# Internal design docs (not for public repo)
+设计文档/

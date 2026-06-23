@@ -39,6 +39,7 @@ dependencies = [
     "python-frontmatter>=1.0.0",
     "tiktoken>=0.5.0",
     "orjson>=3.9.0",
+    "mcp>=1.0.0",
 ]
 
 [project.urls]
@@ -64,6 +65,7 @@ phase2 = [
 
 [project.scripts]
 loom = "loom.cli.main:app"
+loom-mcp = "loom.mcp_server:cli_main"
 
 [tool.setuptools.packages.find]
 include = ["loom*"]

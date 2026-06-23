@@ -8,6 +8,7 @@
 - loom rollback: 回滚错误 commit
 - loom diff    : 检查正文与 Shadow 一致性
 - loom doctor  : 诊断世界线健康度
+- loom auto    : 三 Agent 自主创作循环
 """
 
 import sys
@@ -18,6 +19,7 @@ import typer
 from rich import print as rprint
 from rich.console import Console
 
+from loom.cli.auto import auto_app
 from loom.cli.commit import commit_app
 from loom.cli.stash import stash_app
 from loom.cli.write import write_app
@@ -35,6 +37,7 @@ app = typer.Typer(
 app.add_typer(write_app, name="write")
 app.add_typer(commit_app, name="commit")
 app.add_typer(stash_app, name="stash")
+app.add_typer(auto_app, name="auto")
 
 
 @app.command()

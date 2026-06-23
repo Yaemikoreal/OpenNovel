@@ -76,10 +76,11 @@
 </td>
 <td width="50%">
 
-### 🧠 AI 记忆外脑
-- 自动提取角色/事件/世界观状态
-- 三级权威分级防幻觉
-- 智能上下文组装 + Token 熔断
+### 🤖 三 Agent 自主创作
+- Writer 思考规划 + 沉浸式创作
+- Critic 五维 100 分制评分（≥80 分通过）
+- Manager 自动提取角色状态变更
+- 单章最多 5 次重试，确保质量
 </td>
 </tr>
 <tr>
@@ -95,7 +96,7 @@
 ### 🔄 模型无关
 - 通过 LiteLLM 总线连接任何 LLM
 - 支持 OpenAI / Anthropic / DeepSeek / Ollama / 本地模型
-- 自动适配上下文窗口策略
+- 支持 Writer/Critic/Manager 独立配置模型
 </td>
 </tr>
 <tr>
@@ -108,10 +109,26 @@
 </td>
 <td width="50%">
 
+### 🔌 MCP Server 集成
+- 暴露 4 个 MCP Tools 供 Claude Code 等 Agent 调用
+- `init_project` / `get_status` / `write_chapter` / `auto_create`
+- stdio 传输，开箱即用
+</td>
+</tr>
+<tr>
+<td width="50%">
+
 ### 📦 纯本地优先
 - 所有数据在本地 SQLite + Markdown
 - 可被 git 追踪、Obsidian 打开
 - 无需注册、无需云账号、零数据泄漏
+</td>
+<td width="50%">
+
+### 🎯 全自动模式
+- `loom auto` 一键自主创作整部小说
+- 输入大纲 + 角色 + 世界观 → 输出完整章节
+- 自动记录创作日志和角色状态变更
 </td>
 </tr>
 </table>
@@ -159,6 +176,17 @@ loom stash "深渊不会主动吞噬你——它只是让你自己跳下去。" 
 loom commit ./my-epic/draft/ch_001.md
 ```
 
+### 全自动创作
+
+```bash
+# 准备大纲文件 (outlines/outline.md) 和 loom.yaml 配置
+# 然后一键生成整部小说
+loom auto ./my-epic --chapters 5
+
+# Writer → Critic → Manager 循环，全程无人工干预
+# 每章经过五维评分，≥80 分通过，最多 5 次重试
+```
+
 ---
 
 ## 📟 CLI 命令
@@ -167,11 +195,12 @@ loom commit ./my-epic/draft/ch_001.md
 |:---|:---|:---|
 | `loom init <path>` | 初始化小说项目目录 | ✅ |
 | `loom write <file>` | 沉浸式 AI 续写循环 | ✅ |
+| `loom auto <path>` | 三 Agent 全自动创作 | ✅ |
 | `loom stash <text>` | 存入灵感潜意识池 | ✅ |
 | `loom commit <file>` | 5 步审阅流程固化状态 | ✅ |
 | `loom rollback <snapshot>` | 回滚到指定快照 | ✅ |
-| `loom diff <file>` | 正文 / Shadow 一致性校验 | 🚧 建设中 |
-| `loom doctor <path>` | 世界线健康度诊断 | 🚧 建设中 |
+| `loom diff <file>` | 正文 / Shadow 一致性校验 | ✅ |
+| `loom doctor <path>` | 世界线健康度诊断 | ✅ |
 
 详细命令文档：`loom --help` 或查看 [CLAUDE.md](CLAUDE.md)。
 
@@ -255,26 +284,40 @@ loom/
 ├── cli/                     # Typer CLI 命令入口
 │   ├── main.py              # loom 根命令
 │   ├── write.py             # loom write
+│   ├── auto.py              # loom auto (三 Agent 全自动)
 │   ├── commit.py            # loom commit & rollback
 │   └── stash.py             # loom stash
 ├── core/                    # 核心引擎
 │   ├── llm.py               # LiteLLM 封装
+│   ├── auto_runner.py       # 三 Agent 编排器
 │   ├── context_assembler.py # 上下文组装 & Token 熔断
 │   ├── retriever.py         # 检索路由
 │   ├── state_manager.py     # 快照/回滚/Diff
+│   ├── config.py            # 项目配置管理
 │   └── parser.py            # Markdown/Frontmatter 解析
 ├── agents/                  # 代理人格
 │   ├── actor.py             # Actor 沉浸式续写
-│   └── auditor.py           # Auditor 状态提取
+│   ├── auditor.py           # Auditor 状态提取
+│   ├── writer.py            # Writer Agent (思考+创作+修改)
+│   ├── critic.py            # Critic Agent (五维评分)
+│   └── manager.py           # Manager Agent (状态提取)
 ├── storage/                 # 存储适配
 │   ├── sqlite.py            # SQLite 事件账本
+│   ├── yaml_storage.py      # YAML Frontmatter 安全读写
 │   └── vector.py            # 向量索引
 ├── schemas/                 # 数据模型
 │   ├── character.py         # 角色档案模型
-│   └── event.py             # 事件账本模型
-└── prompts/                 # Prompt 即资产
-    ├── actor.v1.md          # Actor 人格 Prompt
-    └── auditor.v1.md        # Auditor 人格 Prompt
+│   ├── event.py             # 事件账本模型
+│   ├── outline.py           # Writer 结构化大纲
+│   ├── evaluation.py        # Critic 评分模型
+│   └── manager_update.py    # Manager 状态更新模型
+├── prompts/                 # Prompt 即资产
+│   ├── actor.v1.md          # Actor 人格 Prompt
+│   ├── auditor.v1.md        # Auditor 人格 Prompt
+│   ├── writer.v1.md         # Writer Agent Prompt
+│   ├── critic.v1.md         # Critic Agent Prompt
+│   └── manager.v1.md        # Manager Agent Prompt
+└── mcp_server.py            # MCP Server (Claude Code 集成)
 ```
 
 ---
@@ -287,8 +330,6 @@ loom/
 2. 查看 [Issues](https://github.com/Yaemikoreal/LOOM/issues) 寻找想解决的问题
 3. 阅读 [CLAUDE.md](CLAUDE.md) 了解架构约定
 4. Fork 并提交 Pull Request
-
-> **设计文档**: 在 `设计文档/` 目录下，包含详细的技术方案和 PRD（设计冻结，仅做参考）。
 
 ---
 
