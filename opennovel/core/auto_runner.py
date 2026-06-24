@@ -17,6 +17,7 @@ from opennovel.agents.manager import Manager
 from opennovel.agents.writer import Writer
 from opennovel.core.config import LoomConfig
 from opennovel.core.diff_checker import DiffChecker, Mismatch
+from opennovel.core.hybrid_retriever import HybridRetriever
 from opennovel.core.llm import LLMBus
 from opennovel.core.retriever import Retriever
 from opennovel.core.state_manager import StateManager
@@ -116,6 +117,13 @@ class AutoRunner:
         db_path = project_root / ".novel.db"
         event_store = EventStore(db_path) if db_path.exists() else None
 
+        # 混合检索路由器（Phase 2.3）
+        hybrid = HybridRetriever(
+            project_root=project_root,
+            event_store=event_store,
+            retriever=retriever,
+        )
+
         self.writer = Writer(
             llm_bus=self.writer_bus,
             retriever=retriever,
@@ -123,12 +131,14 @@ class AutoRunner:
             creative_direction=config.creative_direction,
             words_per_chapter=config.words_per_chapter,
             event_store=event_store,
+            hybrid_retriever=hybrid,
         )
         self.critic = Critic(
             llm_bus=self.critic_bus,
             project_root=project_root,
             retriever=retriever,
             event_store=event_store,
+            hybrid_retriever=hybrid,
         )
         self.manager = Manager(
             llm_bus=self.manager_bus,

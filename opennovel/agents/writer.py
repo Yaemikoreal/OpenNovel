@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 
 from opennovel.core.context_assembler import ContextStrategy, assemble_context
+from opennovel.core.hybrid_retriever import HybridRetriever
 from opennovel.core.llm import LLMBus
 from opennovel.core.retriever import Retriever
 from opennovel.schemas.outline import ChapterOutline
@@ -37,6 +38,7 @@ class Writer:
         creative_direction: str = "",
         words_per_chapter: int = 3000,
         event_store: EventStore | None = None,
+        hybrid_retriever: HybridRetriever | None = None,
     ) -> None:
         self.llm_bus = llm_bus
         self.retriever = retriever
@@ -47,6 +49,7 @@ class Writer:
         self.creative_direction = creative_direction
         self.words_per_chapter = words_per_chapter
         self.event_store = event_store
+        self.hybrid_retriever = hybrid_retriever
 
     def _get_all_character_ids(self) -> list[str]:
         """获取所有角色 ID。"""
@@ -61,30 +64,42 @@ class Writer:
     ) -> list[dict[str, str]]:
         """通过 ContextAssembler 组装完整上下文（CANON + STATE + SUBCONSCIOUS + 任务）。
 
+        优先使用 HybridRetriever 统一检索，回退到 Retriever + EventStore 分离模式。
+
         Args:
             task_message: 任务指令（大纲/创作/修订等）
 
         Returns:
             组装完成的消息列表
         """
-        canon_content = self.retriever.query_canon(task_message[:500], top_k=3)
-        subconscious_content = self.retriever.query_subconscious(task_message[:500], top_k=2)
-
-        # 从 EventStore 获取因果链上下文（Phase 2.1）
-        causal_chain_context = ""
-        if self.event_store:
-            high_events = self.event_store.get_high_pressure_events(threshold=0.5)
-            if high_events:
-                event_lines = []
-                for e in high_events[-10:]:  # 最近 10 条
-                    chain_info = ""
-                    if e.caused_by:
-                        chain_info = f" ← 由 {e.caused_by} 引起"
-                    event_lines.append(
-                        f"- [{e.event_id}] {e.event_type}: {e.description} "
-                        f"(压强={e.causal_pressure}){chain_info}"
-                    )
-                causal_chain_context = "\n".join(event_lines)
+        if self.hybrid_retriever:
+            # 混合检索模式：统一 SQL + 向量
+            result = self.hybrid_retriever.query_for_writer(
+                chapter_id="", outline_hint=task_message[:500]
+            )
+            canon_content = result.canon_content
+            subconscious_content = result.subconscious_content
+            causal_chain_context = result.causal_chain_context
+        else:
+            # 回退模式：Retriever + EventStore 分离
+            canon_content = self.retriever.query_canon(task_message[:500], top_k=3)
+            subconscious_content = self.retriever.query_subconscious(
+                task_message[:500], top_k=2
+            )
+            causal_chain_context = ""
+            if self.event_store:
+                high_events = self.event_store.get_high_pressure_events(threshold=0.5)
+                if high_events:
+                    event_lines = []
+                    for e in high_events[-10:]:
+                        chain_info = ""
+                        if e.caused_by:
+                            chain_info = f" ← 由 {e.caused_by} 引起"
+                        event_lines.append(
+                            f"- [{e.event_id}] {e.event_type}: {e.description} "
+                            f"(压强={e.causal_pressure}){chain_info}"
+                        )
+                    causal_chain_context = "\n".join(event_lines)
 
         return assemble_context(
             project_root=self.project_root,

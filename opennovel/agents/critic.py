@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 
 from opennovel.core.context_assembler import ContextStrategy, assemble_context
+from opennovel.core.hybrid_retriever import HybridRetriever
 from opennovel.core.llm import LLMBus
 from opennovel.core.retriever import Retriever
 from opennovel.schemas.evaluation import ChapterEvaluation
@@ -38,6 +39,7 @@ class Critic:
         prompt_path: Path | None = None,
         retriever: Retriever | None = None,
         event_store: EventStore | None = None,
+        hybrid_retriever: HybridRetriever | None = None,
     ) -> None:
         self.llm_bus = llm_bus
         self.project_root = project_root
@@ -46,6 +48,7 @@ class Critic:
         )
         self.retriever = retriever
         self.event_store = event_store
+        self.hybrid_retriever = hybrid_retriever
 
     def _load_prompt(self) -> str:
         """加载 Critic Prompt，文件不存在时返回硬编码兜底。"""
@@ -69,28 +72,39 @@ class Critic:
 
         注入 CANON（世界观校验基准）、STATE_MEMORY（角色状态校验基准）、
         SUBCONSCIOUS（情感表达参考）和因果链上下文（因果一致性校验）。
+        优先使用 HybridRetriever 统一检索。
         """
-        canon_content = ""
-        subconscious_content = ""
-        if self.retriever:
-            canon_content = self.retriever.query_canon(task_message[:500], top_k=3)
-            subconscious_content = self.retriever.query_subconscious(task_message[:500], top_k=2)
-
-        # 从 EventStore 获取因果链上下文（Phase 2.1）
-        causal_chain_context = ""
-        if self.event_store:
-            high_events = self.event_store.get_high_pressure_events(threshold=0.5)
-            if high_events:
-                event_lines = []
-                for e in high_events[-10:]:
-                    chain_info = ""
-                    if e.caused_by:
-                        chain_info = f" ← 由 {e.caused_by} 引起"
-                    event_lines.append(
-                        f"- [{e.event_id}] {e.event_type}: {e.description} "
-                        f"(压强={e.causal_pressure}){chain_info}"
-                    )
-                causal_chain_context = "\n".join(event_lines)
+        if self.hybrid_retriever:
+            # 混合检索模式
+            result = self.hybrid_retriever.query_for_critic(
+                chapter_id="", chapter_text=task_message[:1000]
+            )
+            canon_content = result.canon_content
+            subconscious_content = result.subconscious_content
+            causal_chain_context = result.causal_chain_context
+        else:
+            # 回退模式
+            canon_content = ""
+            subconscious_content = ""
+            if self.retriever:
+                canon_content = self.retriever.query_canon(task_message[:500], top_k=3)
+                subconscious_content = self.retriever.query_subconscious(
+                    task_message[:500], top_k=2
+                )
+            causal_chain_context = ""
+            if self.event_store:
+                high_events = self.event_store.get_high_pressure_events(threshold=0.5)
+                if high_events:
+                    event_lines = []
+                    for e in high_events[-10:]:
+                        chain_info = ""
+                        if e.caused_by:
+                            chain_info = f" ← 由 {e.caused_by} 引起"
+                        event_lines.append(
+                            f"- [{e.event_id}] {e.event_type}: {e.description} "
+                            f"(压强={e.causal_pressure}){chain_info}"
+                        )
+                    causal_chain_context = "\n".join(event_lines)
 
         return assemble_context(
             project_root=self.project_root,
