@@ -28,7 +28,7 @@ class CharacterUpdate(BaseModel):
 
 
 class EventRecord(BaseModel):
-    """事件记录。"""
+    """事件记录，支持因果链字段。"""
 
     event_id: str
     character_id: str
@@ -36,6 +36,8 @@ class EventRecord(BaseModel):
     description: str
     causal_pressure: float
     timestamp: str
+    caused_by: str | None = None
+    related_event_ids: list[str] | None = None
 
     @field_validator("character_id")
     @classmethod

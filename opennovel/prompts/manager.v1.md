@@ -36,6 +36,25 @@
 - 事件类型: INJURY, HEAL, ITEM_GAIN, ITEM_LOSS, KNOWLEDGE, LOCATION_CHANGE, EMOTION_SHIFT, RELATIONSHIP_CHANGE, CUSTOM
 - 因果压强: 0.0-1.0
 
+### 因果链标记（重要）
+
+每个事件可能携带因果链字段，用于构建事件 DAG：
+
+- **caused_by**: 填写直接导致本事件的前置事件 ID。仅当因果关系**明确**时填写。
+  - 例：角色受伤（evt_001）→ 后续治疗（evt_002 的 caused_by = "evt_001"）
+  - 例：获得情报（evt_003）→ 决定行动（evt_004 的 caused_by = "evt_003"）
+  - 如果没有明确的前置事件，留 null
+
+- **related_event_ids**: 填写叙事上相关但无直接因果的事件 ID 列表。
+  - 例：同一场战斗中的多个事件互相关联
+  - 例：同一场景中不同角色的事件
+  - 如果没有关联事件，留 null
+
+**判断规则**:
+- A 发生后**直接导致** B 发生 → B.caused_by = A
+- A 和 B 在同一场景/情节中**相关但独立** → 互相加入 related_event_ids
+- 无法确定关系 → 两个字段都留 null
+
 ## 输出格式
 
 你必须输出合法的 JSON 对象，包含以下字段：
@@ -63,7 +82,19 @@
       "event_type": "INJURY",
       "description": "灰潮风暴中右臂被碎片划伤",
       "causal_pressure": 0.6,
-      "timestamp": "灾变第47天傍晚"
+      "timestamp": "灾变第47天傍晚",
+      "caused_by": null,
+      "related_event_ids": ["evt_ch002_002"]
+    },
+    {
+      "event_id": "evt_ch002_002",
+      "character_id": "char_001",
+      "event_type": "HEAL",
+      "description": "为灰潮处理伤口并包扎",
+      "causal_pressure": 0.5,
+      "timestamp": "灾变第47天傍晚",
+      "caused_by": "evt_ch002_001",
+      "related_event_ids": null
     }
   ],
   "chapter_summary": "本章中，四人遭遇灰潮风暴..."

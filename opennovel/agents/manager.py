@@ -10,8 +10,8 @@ from pathlib import Path
 
 from opennovel.core.llm import LLMBus
 from opennovel.core.state_manager import StateManager
-from opennovel.schemas.event import EventCreate, EventType
-from opennovel.schemas.manager_update import CharacterUpdate, EventRecord, ManagerUpdateResult
+from opennovel.schemas.event import EventCreate
+from opennovel.schemas.manager_update import ManagerUpdateResult
 from opennovel.storage.yaml_storage import YAMLStorage
 
 logger = logging.getLogger(__name__)
@@ -87,15 +87,40 @@ class Manager:
 
         return "\n\n".join(summaries)
 
+    def _get_recent_events_context(self, limit: int = 10) -> str:
+        """获取近期高因果压强事件，用于因果链推断。"""
+        try:
+            store = self.state_manager.event_store
+            events = store.get_high_pressure_events(threshold=0.5)
+            if not events:
+                return "暂无历史事件记录。"
+
+            # 取最近 N 条
+            recent = events[:limit]
+            lines = []
+            for evt in recent:
+                chain_info = ""
+                if evt.caused_by:
+                    chain_info = f" [因果: 由 {evt.caused_by} 引起]"
+                lines.append(
+                    f"- {evt.event_id} ({evt.event_type}): {evt.description} "
+                    f"[压强={evt.causal_pressure}]{chain_info}"
+                )
+            return "\n".join(lines)
+        except Exception as e:
+            logger.warning("获取历史事件上下文失败: %s", e)
+            return "无法获取历史事件。"
+
     def _build_messages(
         self,
         chapter_id: str,
         chapter_text: str,
         active_characters: list[str],
     ) -> list[dict[str, str]]:
-        """组装 Manager 消息列表。"""
+        """组装 Manager 消息列表，包含因果链上下文。"""
         prompt = self._load_prompt()
         states = self._get_character_states(active_characters)
+        recent_events = self._get_recent_events_context()
 
         user_content = f"""## 状态提取任务
 
@@ -106,6 +131,9 @@ class Manager:
 
 ### 角色当前状态
 {states or "无角色状态信息"}
+
+### 历史事件（用于因果链推断）
+{recent_events}
 
 ### 章节正文
 
@@ -128,11 +156,18 @@ class Manager:
       "event_type": "INJURY",
       "description": "事件描述",
       "causal_pressure": 0.7,
-      "timestamp": "故事内时间"
+      "timestamp": "故事内时间",
+      "caused_by": "evt_xxx（前置事件 ID，可选）",
+      "related_event_ids": ["evt_yyy（关联事件 ID 列表，可选）"]
     }}
   ],
   "chapter_summary": "本章摘要（300字以内）"
-}}"""
+}}
+
+### 因果链规则
+- `caused_by`: 仅当本事件**直接由**某个已有事件引起时填写（如：受伤 → 后续治疗）
+- `related_event_ids`: 叙事上相关但无直接因果的事件（如：同一场战斗中的多个事件）
+- 如果无法确定因果关系，这两个字段留 null"""
 
         return [
             {"role": "system", "content": prompt},
@@ -144,7 +179,7 @@ class Manager:
         cleaned = text.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [ln for ln in lines if not ln.strip().startswith("```")]
             cleaned = "\n".join(lines)
 
         data = json.loads(cleaned)
@@ -185,6 +220,8 @@ class Manager:
                     event_type=event.event_type,
                     description=event.description,
                     causal_pressure=event.causal_pressure,
+                    caused_by=event.caused_by,
+                    related_event_ids=event.related_event_ids,
                 )
                 self.state_manager.apply_event(event_create)
                 applied_event_ids.append(event.event_id)

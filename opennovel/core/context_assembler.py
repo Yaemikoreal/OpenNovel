@@ -248,6 +248,7 @@ def assemble_context(
     chapter_path: Path | None = None,
     canon_content: str = "",
     subconscious_content: str = "",
+    causal_chain_context: str = "",
     active_characters: list[str] | None = None,
     yaml_storage: YAMLStorage | None = None,
     strategy: ContextStrategy = ContextStrategy.STANDARD,
@@ -261,6 +262,7 @@ def assemble_context(
     - task_message 参数化，不再硬编码 CONTINUE:
     - active_characters 可显式传入（不依赖 chapter_path 的 Frontmatter）
     - prompt_path 必须显式指定
+    - causal_chain_context 注入因果链上下文（Phase 2.1）
 
     Args:
         project_root: 项目根目录路径
@@ -269,6 +271,7 @@ def assemble_context(
         chapter_path: 当前章节路径（可选，用于提取活跃角色和历史章节注入）
         canon_content: 从检索引擎获取的设定内容
         subconscious_content: 从潜意识池检索的灵感碎片
+        causal_chain_context: 因果链上下文文本（格式化的事件因果关系）
         active_characters: 显式指定的角色 ID 列表（优先于从 chapter_path 提取）
         yaml_storage: YAML 存储实例
         strategy: 上下文组装策略
@@ -284,6 +287,7 @@ def assemble_context(
             prompt_path,
             canon_content,
             subconscious_content,
+            causal_chain_context,
             active_characters,
             yaml_storage,
         )
@@ -295,6 +299,7 @@ def assemble_context(
             prompt_path,
             canon_content,
             subconscious_content,
+            causal_chain_context,
             active_characters,
             yaml_storage,
         )
@@ -306,6 +311,7 @@ def assemble_context(
             prompt_path,
             canon_content,
             subconscious_content,
+            causal_chain_context,
             active_characters,
             yaml_storage,
         )
@@ -321,6 +327,7 @@ def _assemble_frugal(
     prompt_path: Path,
     canon_content: str,
     subconscious_content: str,
+    causal_chain_context: str,
     active_characters: list[str] | None,
     yaml_storage: YAMLStorage | None,
 ) -> list[dict[str, str]]:
@@ -394,6 +401,23 @@ def _assemble_frugal(
         messages.append(msg)
         total_tokens += sub_tokens
 
+    # 4.5 因果链上下文 (STATE MEMORY | MEDIUM) — Phase 2.1
+    if causal_chain_context:
+        chain_text = wrap_with_authority_tag(
+            f"[CAUSAL CHAIN]\n{causal_chain_context}", AuthorityLevel.STATE_MEMORY
+        )
+        chain_tokens = counter.count(chain_text)
+        chain_budget = int(INPUT_TOKEN_BUDGET * 0.10)  # 分配 10% 预算
+        if chain_tokens > chain_budget:
+            chain_text = counter.truncate_to_budget(chain_text, chain_budget)
+            chain_tokens = chain_budget
+        msg = ContextMessage(
+            role="system", content=chain_text, authority=AuthorityLevel.STATE_MEMORY
+        )
+        msg.token_count = chain_tokens
+        messages.append(msg)
+        total_tokens += chain_tokens
+
     # 5. 任务消息（替代硬编码的 CONTINUE:）
     task_budget = int(INPUT_TOKEN_BUDGET * BUDGET_RATIOS["recent_text"])
     remaining_budget = INPUT_TOKEN_BUDGET - total_tokens
@@ -422,6 +446,7 @@ def _assemble_standard(
     prompt_path: Path,
     canon_content: str,
     subconscious_content: str,
+    causal_chain_context: str,
     active_characters: list[str] | None,
     yaml_storage: YAMLStorage | None,
 ) -> list[dict[str, str]]:
@@ -507,6 +532,23 @@ def _assemble_standard(
         messages.append(msg)
         total_tokens += sub_tokens
 
+    # 4.5 因果链上下文 (STATE MEMORY) — 分配 10% 预算 — Phase 2.1
+    if causal_chain_context:
+        chain_budget = int(budget * 0.10)
+        chain_text = wrap_with_authority_tag(
+            f"[CAUSAL CHAIN]\n{causal_chain_context}", AuthorityLevel.STATE_MEMORY
+        )
+        chain_tokens = counter.count(chain_text)
+        if chain_tokens > chain_budget:
+            chain_text = counter.truncate_to_budget(chain_text, chain_budget)
+            chain_tokens = chain_budget
+        msg = ContextMessage(
+            role="system", content=chain_text, authority=AuthorityLevel.STATE_MEMORY
+        )
+        msg.token_count = chain_tokens
+        messages.append(msg)
+        total_tokens += chain_tokens
+
     # 5. 任务消息 — 使用剩余预算
     remaining_budget = budget - total_tokens
     if remaining_budget > 0 and task_message:
@@ -533,6 +575,7 @@ def _assemble_panoramic(
     prompt_path: Path,
     canon_content: str,
     subconscious_content: str,
+    causal_chain_context: str,
     active_characters: list[str] | None,
     yaml_storage: YAMLStorage | None,
 ) -> list[dict[str, str]]:
@@ -543,6 +586,7 @@ def _assemble_panoramic(
     - 设定和潜意识不做截断，全量注入
     - 注入所有活跃角色状态
     - 历史章节倒序注入（需要 chapter_path）
+    - 因果链全量注入
     """
     counter = TokenCounter()
     messages: list[ContextMessage] = []
@@ -601,6 +645,19 @@ def _assemble_panoramic(
         msg.token_count = sub_tokens
         messages.append(msg)
         total_tokens += sub_tokens
+
+    # 4.5 因果链上下文 (STATE MEMORY) — 全量注入 — Phase 2.1
+    if causal_chain_context:
+        chain_text = wrap_with_authority_tag(
+            f"[CAUSAL CHAIN]\n{causal_chain_context}", AuthorityLevel.STATE_MEMORY
+        )
+        chain_tokens = counter.count(chain_text)
+        msg = ContextMessage(
+            role="system", content=chain_text, authority=AuthorityLevel.STATE_MEMORY
+        )
+        msg.token_count = chain_tokens
+        messages.append(msg)
+        total_tokens += chain_tokens
 
     # 5. 历史章节倒序注入 — PANORAMIC 独有（需要 chapter_path）
     remaining_budget = budget - total_tokens

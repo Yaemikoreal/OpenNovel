@@ -2,8 +2,13 @@
 
 事件账本是 OpenNovel 的全局因果追踪核心，记录所有叙事中的状态变更事件。
 每个事件通过 Canonical ID 关联角色/地点/物品，并携带因果压强指标。
+
+因果链系统 (Phase 2.1):
+- caused_by: 指向前置事件 ID，形成因果 DAG 边
+- related_event_ids: JSON 数组，存储关联但非因果的事件
 """
 
+import json
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -44,6 +49,15 @@ class EventLogBase(SQLModel):
         default=0.5,
         description="因果压强 0.1~1.0，值越高表示该事件对后续叙事影响越大",
     )
+    caused_by: str | None = SQLField(
+        default=None,
+        index=True,
+        description="前置事件 ID，形成因果 DAG 边。如 evt_001_injury → evt_002_heal",
+    )
+    related_event_ids: str | None = SQLField(
+        default=None,
+        description="关联事件 ID 列表（JSON 数组），非因果关系但叙事上相关",
+    )
 
     @field_validator("causal_pressure")
     @classmethod
@@ -67,12 +81,29 @@ class EventLog(EventLogBase, table=True):
 
     记录叙事中发生的所有状态变更事件，支持跨章节因果溯源。
     所有 ID 字段必须使用 Canonical ID 规范（如 char_001, loc_london）。
+
+    因果链字段:
+    - caused_by: 指向前置事件 event_id，形成有向边（DAG）
+    - related_event_ids: JSON 数组，存储叙事相关但非因果的事件
     """
 
     __tablename__ = "event_log"
 
     id: int | None = SQLField(default=None, primary_key=True)
     created_at: str | None = SQLField(default=None, description="记录创建时间（系统时间）")
+
+    def get_related_ids(self) -> list[str]:
+        """解析 related_event_ids JSON 字符串为列表。"""
+        if not self.related_event_ids:
+            return []
+        try:
+            return json.loads(self.related_event_ids)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def set_related_ids(self, ids: list[str]) -> None:
+        """将事件 ID 列表序列化为 JSON 存储。"""
+        self.related_event_ids = json.dumps(ids) if ids else None
 
 
 class EventCreate(BaseModel):
@@ -85,6 +116,8 @@ class EventCreate(BaseModel):
     event_type: EventType = Field(description="事件类型")
     description: str = Field(description="事件描述")
     causal_pressure: float = Field(default=0.5, ge=0.0, le=1.0, description="因果压强")
+    caused_by: str | None = Field(default=None, description="前置事件 ID")
+    related_event_ids: list[str] | None = Field(default=None, description="关联事件 ID 列表")
 
 
 class EventDiff(BaseModel):

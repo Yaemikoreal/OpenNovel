@@ -70,19 +70,21 @@ class Writer:
         canon_content = self.retriever.query_canon(task_message[:500], top_k=3)
         subconscious_content = self.retriever.query_subconscious(task_message[:500], top_k=2)
 
-        # 从 EventStore 获取近期高压力事件摘要
-        event_summary = ""
+        # 从 EventStore 获取因果链上下文（Phase 2.1）
+        causal_chain_context = ""
         if self.event_store:
             high_events = self.event_store.get_high_pressure_events(threshold=0.5)
             if high_events:
-                event_lines = [
-                    f"- [{e.event_type}] {e.description} (pressure={e.causal_pressure})"
-                    for e in high_events[-10:]  # 最近 10 条
-                ]
-                event_summary = "\n".join(event_lines)
-
-        if event_summary:
-            task_message = f"### 近期高因果压力事件\n{event_summary}\n\n{task_message}"
+                event_lines = []
+                for e in high_events[-10:]:  # 最近 10 条
+                    chain_info = ""
+                    if e.caused_by:
+                        chain_info = f" ← 由 {e.caused_by} 引起"
+                    event_lines.append(
+                        f"- [{e.event_id}] {e.event_type}: {e.description} "
+                        f"(压强={e.causal_pressure}){chain_info}"
+                    )
+                causal_chain_context = "\n".join(event_lines)
 
         return assemble_context(
             project_root=self.project_root,
@@ -90,6 +92,7 @@ class Writer:
             prompt_path=self.prompt_path,
             canon_content=canon_content,
             subconscious_content=subconscious_content,
+            causal_chain_context=causal_chain_context,
             active_characters=self._get_all_character_ids(),
             strategy=ContextStrategy.STANDARD,
         )

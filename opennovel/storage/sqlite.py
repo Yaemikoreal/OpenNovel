@@ -4,6 +4,7 @@
 - 事件的增删改查
 - 按章节/角色/类型的多维查询
 - 因果压强排序
+- 因果链 DAG 追溯（Phase 2.1）
 """
 
 import logging
@@ -61,6 +62,8 @@ class EventStore:
         Returns:
             写入数据库的 EventLog 记录
         """
+        import json
+
         record = EventLog(
             event_id=event.event_id,
             chapter_id=event.chapter_id,
@@ -69,6 +72,10 @@ class EventStore:
             event_type=event.event_type.value,
             description=event.description,
             causal_pressure=event.causal_pressure,
+            caused_by=event.caused_by,
+            related_event_ids=json.dumps(event.related_event_ids)
+            if event.related_event_ids
+            else None,
             created_at=datetime.now().isoformat(),
         )
         with Session(self._engine) as session:
@@ -87,6 +94,8 @@ class EventStore:
         Returns:
             写入数据库的 EventLog 记录列表
         """
+        import json
+
         records: list[EventLog] = []
         with Session(self._engine) as session:
             for event in events:
@@ -98,6 +107,10 @@ class EventStore:
                     event_type=event.event_type.value,
                     description=event.description,
                     causal_pressure=event.causal_pressure,
+                    caused_by=event.caused_by,
+                    related_event_ids=json.dumps(event.related_event_ids)
+                    if event.related_event_ids
+                    else None,
                     created_at=datetime.now().isoformat(),
                 )
                 session.add(record)
@@ -212,4 +225,124 @@ class EventStore:
         """
         with Session(self._engine) as session:
             statement = select(EventLog).order_by(EventLog.id)
+            return list(session.exec(statement).all())
+
+    # ── 因果链 DAG 查询 (Phase 2.1) ──────────────────────────────────
+
+    def get_causal_chain(
+        self, event_id: str, max_depth: int = 10
+    ) -> list[EventLog]:
+        """沿 caused_by 边向上追溯因果链。
+
+        从指定事件出发，递归查找其前置因果事件，直到链顶或达到最大深度。
+        返回的列表按因果顺序排列（最早事件在前）。
+
+        Args:
+            event_id: 起始事件 ID
+            max_depth: 最大追溯深度，防止环路导致无限递归
+
+        Returns:
+            因果链上的事件列表（按时间顺序，最早在前）
+        """
+        chain: list[EventLog] = []
+        visited: set[str] = set()
+        current_id: str | None = event_id
+
+        while current_id and current_id not in visited and len(chain) < max_depth:
+            visited.add(current_id)
+            event = self.get_event_by_id(current_id)
+            if event is None:
+                break
+            chain.append(event)
+            current_id = event.caused_by
+
+        # 反转使最早事件在前
+        chain.reverse()
+        return chain
+
+    def get_causal_descendants(
+        self, event_id: str, max_depth: int = 10
+    ) -> list[EventLog]:
+        """沿 caused_by 边向下查找因果后继。
+
+        从指定事件出发，查找所有以它为 caused_by 的后续事件，
+        递归展开形成因果树的子分支。
+
+        Args:
+            event_id: 起始事件 ID
+            max_depth: 最大查找深度
+
+        Returns:
+            因果后继事件列表（按因果层级广度优先排列）
+        """
+        result: list[EventLog] = []
+        frontier = [event_id]
+        visited: set[str] = {event_id}
+
+        for _ in range(max_depth):
+            if not frontier:
+                break
+            next_frontier: list[str] = []
+            with Session(self._engine) as session:
+                for fid in frontier:
+                    statement = select(EventLog).where(EventLog.caused_by == fid)
+                    children = list(session.exec(statement).all())
+                    for child in children:
+                        if child.event_id not in visited:
+                            visited.add(child.event_id)
+                            result.append(child)
+                            next_frontier.append(child.event_id)
+            frontier = next_frontier
+
+        return result
+
+    def get_related_events(self, event_id: str) -> list[EventLog]:
+        """查询与指定事件关联的事件（非因果关系）。
+
+        通过 related_event_ids JSON 字段查找叙事上相关但无直接因果关系的事件。
+
+        Args:
+            event_id: 起始事件 ID
+
+        Returns:
+            关联事件列表
+        """
+        event = self.get_event_by_id(event_id)
+        if event is None:
+            return []
+
+        related_ids = event.get_related_ids()
+        if not related_ids:
+            return []
+
+        related_events: list[EventLog] = []
+        for rid in related_ids:
+            related = self.get_event_by_id(rid)
+            if related is not None:
+                related_events.append(related)
+        return related_events
+
+    def get_events_by_character_and_type(
+        self, character_id: str, event_type: str
+    ) -> list[EventLog]:
+        """按角色 + 事件类型精确查询。
+
+        用于混合检索中的 SQL 精确召回路径。
+
+        Args:
+            character_id: 角色 Canonical ID
+            event_type: 事件类型
+
+        Returns:
+            匹配的事件列表，按因果压强降序
+        """
+        with Session(self._engine) as session:
+            statement = (
+                select(EventLog)
+                .where(
+                    EventLog.character_id == character_id,
+                    EventLog.event_type == event_type,
+                )
+                .order_by(EventLog.causal_pressure.desc())
+            )
             return list(session.exec(statement).all())
