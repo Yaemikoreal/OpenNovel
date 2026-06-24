@@ -6,8 +6,8 @@ Gen2 自主创作系统（Writer/Critic/Manager）绕过了为 Gen1 Actor 设计
 
 LOOM 有两代 Agent 系统：
 
-- **Gen1**（交互式）：Actor + Auditor，通过 `loom write` / `loom commit` 驱动。Actor 使用 `context_assembler.py` 组装包含 CANON / STATE MEMORY / SUBCONSCIOUS 的分级上下文，具备三级策略（FRUGAL/STANDARD/PANORAMIC）、权威分级注入和 Token 熔断机制。
-- **Gen2**（自主式）：Writer + Critic + Manager，通过 `loom auto` 驱动。Writer 和 Critic 各自接收手动传入的简单参数，完全绕过 `context_assembler.py`。
+- **Gen1**（交互式）：Actor + Auditor，通过 `novel write` / `novel commit` 驱动。Actor 使用 `context_assembler.py` 组装包含 CANON / STATE MEMORY / SUBCONSCIOUS 的分级上下文，具备三级策略（FRUGAL/STANDARD/PANORAMIC）、权威分级注入和 Token 熔断机制。
+- **Gen2**（自主式）：Writer + Critic + Manager，通过 `novel auto` 驱动。Writer 和 Critic 各自接收手动传入的简单参数，完全绕过 `context_assembler.py`。
 
 ## 问题
 

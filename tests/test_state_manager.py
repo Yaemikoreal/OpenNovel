@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from loom.core.state_manager import StateManager, _serialize_frontmatter
-from loom.schemas.character import CharacterFrontmatter
-from loom.schemas.event import EventCreate, EventType
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.core.state_manager import StateManager, _serialize_frontmatter
+from opennovel.schemas.character import CharacterFrontmatter
+from opennovel.schemas.event import EventCreate, EventType
+from opennovel.storage.yaml_storage import YAMLStorage
 
 
 @pytest.fixture
@@ -314,7 +314,7 @@ class TestGenerateDiffText:
 
     def test_generate_add_diff(self, project_root: Path) -> None:
         """测试生成 add 类型的 Diff。"""
-        from loom.schemas.event import EventDiff
+        from opennovel.schemas.event import EventDiff
 
         manager = StateManager(project_root)
         event = EventCreate(
@@ -335,7 +335,7 @@ class TestGenerateDiffText:
 
     def test_generate_remove_diff(self, project_root: Path) -> None:
         """测试生成 remove 类型的 Diff。"""
-        from loom.schemas.event import EventDiff
+        from opennovel.schemas.event import EventDiff
 
         manager = StateManager(project_root)
         event = EventCreate(
@@ -360,7 +360,7 @@ class TestGenerateDiffText:
 
     def test_generate_modify_diff(self, project_root: Path) -> None:
         """测试生成 modify 类型的 Diff（覆盖 lines 264-265）。"""
-        from loom.schemas.event import EventDiff
+        from opennovel.schemas.event import EventDiff
 
         manager = StateManager(project_root)
         event_before = EventCreate(

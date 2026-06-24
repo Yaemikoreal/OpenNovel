@@ -1,4 +1,4 @@
-# L.O.O.M.
+# OpenNovel
 
 本地优先的长篇小说叙事操作系统。作者只写纯文本 Markdown，由系统在底层维护世界观的一致性。
 
@@ -44,13 +44,13 @@ _Avoid_: Shadow、状态缓存
 _Avoid_: 潜意识、灵感池
 
 **Dirty Flag**:
-当 `loom commit` 中 Auditor 三次提取均失败且用户选择脏提交时，在章节 Frontmatter 中强制写入 `dirty_flag: extraction_failed`，标记该章节状态不可信。
+当 `novel commit` 中 Auditor 三次提取均失败且用户选择脏提交时，在章节 Frontmatter 中强制写入 `dirty_flag: extraction_failed`，标记该章节状态不可信。
 _Avoid_: 静默跳过
 
 ### 流程
 
 **Commit 审阅流**:
-`loom commit` 的 5 步流程：①快照生成 → ②Auditor 提取（含最多 3 次自省纠偏）→ ③Diff 展示 → ④人工确认 → ⑤写入固化。若 Auditor 连续 3 次失败则进入人类急救模式：编辑残次 JSON / 脏提交 / 终止。
+`novel commit` 的 5 步流程：①快照生成 → ②Auditor 提取（含最多 3 次自省纠偏）→ ③Diff 展示 → ④人工确认 → ⑤写入固化。若 Auditor 连续 3 次失败则进入人类急救模式：编辑残次 JSON / 脏提交 / 终止。
 
 **Rescue Mode**:
 Auditor 三次提取均失败后的 fallback。提供三个选项：[E]dit（手动修补 JSON）、[S]kip（脏提交，打 dirty_flag）、[A]bort（终止 commit）。
@@ -72,13 +72,13 @@ _Avoid_: EmotionalState, emotion_vector
 SQLite 中存储的全局因果事件账本，记录所有经人工确认的状态变更事件。
 
 **Snapshot**:
-`loom commit` 前自动生成的文件级增量快照（`.snapshots/*.snapshot.json`），仅记录被本次 commit 涉及的文件的 `fm_before` 和 `fm_after`。回滚时按文件逐条覆写，覆写前校验当前文件与 `fm_after` 是否一致（防止覆盖人类在间隙中的手动修改）。不涉及的文件绝不触碰。
+`novel commit` 前自动生成的文件级增量快照（`.snapshots/*.snapshot.json`），仅记录被本次 commit 涉及的文件的 `fm_before` 和 `fm_after`。回滚时按文件逐条覆写，覆写前校验当前文件与 `fm_after` 是否一致（防止覆盖人类在间隙中的手动修改）。不涉及的文件绝不触碰。
 _Avoid_: 全局全量 dump、field_path 级 JSON Patch
 
 ### 自主创作系统（Gen2）
 
 **AutoRunner**:
-`loom auto` 的编排器（非 Agent），负责解析大纲、按序执行章节流水线（think → write → evaluate → revise → update）、管理重试和日志。纯调度逻辑，不做叙事判断。
+`novel auto` 的编排器（非 Agent），负责解析大纲、按序执行章节流水线（think → write → evaluate → revise → update）、管理重试和日志。纯调度逻辑，不做叙事判断。
 _Avoid_: 导演、Orchestrator
 
 **Director Agent**（规划中）:
@@ -98,7 +98,7 @@ Critic 反馈的结构化升级。从 `list[str]` 升级为包含文本定位信
 Critic 对大纲方案的三维评审（情节逻辑/角色一致性/节奏设计），每维 20 分，满分 60 分。用于盲目变异流程中的多方案预审选择。实现于 `agents/critic.py` 的 `evaluate_outline()` 方法和 `schemas/outline_evaluation.py`。
 
 **Director Agent**:
-创作总监 Agent，从全局视角分析已完成章节的叙事状态（评分趋势、因果压力曲线、角色弧线），输出策略指导注入下一章的 `chapter_hint`。实现于 `agents/director.py`。通过 `loom.yaml` 的 `director_enabled` 配置开关控制。
+创作总监 Agent，从全局视角分析已完成章节的叙事状态（评分趋势、因果压力曲线、角色弧线），输出策略指导注入下一章的 `chapter_hint`。实现于 `agents/director.py`。通过 `novel.yaml` 的 `director_enabled` 配置开关控制。
 
 **Checkpoint**:
-`loom auto` 的事后保护机制。每章写入前自动创建快照（`StateManager.create_snapshot()`），写入后完成快照并运行 `DiffChecker.check_chapter()` 进行一致性校验。校验结果记入 `run_log.md`，支持 `loom rollback` 回滚到任意章节。实现于 `core/auto_runner.py`。
+`novel auto` 的事后保护机制。每章写入前自动创建快照（`StateManager.create_snapshot()`），写入后完成快照并运行 `DiffChecker.check_chapter()` 进行一致性校验。校验结果记入 `run_log.md`，支持 `novel rollback` 回滚到任意章节。实现于 `core/auto_runner.py`。

@@ -28,7 +28,7 @@ env/
 *.bak
 
 # Loom specific
-.loom.db
+.novel.db
 .index/
 .snapshots/
 *.snapshot.json

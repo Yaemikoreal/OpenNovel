@@ -7,14 +7,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from loom.agents.critic import Critic
-from loom.agents.manager import Manager
-from loom.agents.writer import Writer
-from loom.core.auto_runner import AutoRunner, ChapterResult, RunReport
-from loom.core.config import LoomConfig
-from loom.schemas.evaluation import ChapterEvaluation, DimensionScore
-from loom.schemas.manager_update import ManagerUpdateResult
-from loom.schemas.outline import ChapterOutline, SceneBreakdown
+from opennovel.agents.critic import Critic
+from opennovel.agents.manager import Manager
+from opennovel.agents.writer import Writer
+from opennovel.core.auto_runner import AutoRunner, ChapterResult, RunReport
+from opennovel.core.config import LoomConfig
+from opennovel.schemas.evaluation import ChapterEvaluation, DimensionScore
+from opennovel.schemas.manager_update import ManagerUpdateResult
+from opennovel.schemas.outline import ChapterOutline, SceneBreakdown
 
 # ── Mock LiteLLM 响应对象（属性访问模式）──
 
@@ -127,8 +127,8 @@ def empty_project_root(tmp_path: Path) -> Path:
     (root / "prompts").mkdir()
     (root / ".snapshots").mkdir()
     (root / ".index").mkdir()
-    # 写入 loom.yaml 配置
-    (root / "loom.yaml").write_text(
+    # 写入 novel.yaml 配置
+    (root / "novel.yaml").write_text(
         "model: test-model\napi_base: http://localhost:8080\napi_key: test-key\n",
         encoding="utf-8",
     )
@@ -167,12 +167,12 @@ def outline_text() -> str:
 class TestAutoRunnerInit:
     """AutoRunner 初始化测试。"""
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
-    @patch("loom.core.auto_runner.Writer")
-    @patch("loom.core.auto_runner.Critic")
-    @patch("loom.core.auto_runner.Manager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.Writer")
+    @patch("opennovel.core.auto_runner.Critic")
+    @patch("opennovel.core.auto_runner.Manager")
     def test_init_creates_three_agents(
         self,
         mock_manager_cls: MagicMock,
@@ -195,12 +195,12 @@ class TestAutoRunnerInit:
         mock_critic_cls.assert_called_once()
         mock_manager_cls.assert_called_once()
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
-    @patch("loom.core.auto_runner.Writer")
-    @patch("loom.core.auto_runner.Critic")
-    @patch("loom.core.auto_runner.Manager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.Writer")
+    @patch("opennovel.core.auto_runner.Critic")
+    @patch("opennovel.core.auto_runner.Manager")
     def test_init_llm_bus_configs(
         self,
         mock_manager_cls: MagicMock,
@@ -225,12 +225,12 @@ class TestAutoRunnerInit:
             assert kwargs["api_base"] == "http://localhost:8080"
             assert kwargs["api_key"] == "test-key"
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
-    @patch("loom.core.auto_runner.Writer")
-    @patch("loom.core.auto_runner.Critic")
-    @patch("loom.core.auto_runner.Manager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.Writer")
+    @patch("opennovel.core.auto_runner.Critic")
+    @patch("opennovel.core.auto_runner.Manager")
     def test_init_with_agent_specific_config(
         self,
         mock_manager_cls: MagicMock,
@@ -242,7 +242,7 @@ class TestAutoRunnerInit:
         empty_project_root: Path,
     ) -> None:
         """测试 per-agent LLM 配置覆盖。"""
-        from loom.core.config import AgentConfig
+        from opennovel.core.config import AgentConfig
 
         config = LoomConfig(
             model="default-model",
@@ -268,12 +268,12 @@ class TestAutoRunnerInit:
 class TestParseOutline:
     """_parse_outline 大纲解析测试。"""
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
-    @patch("loom.core.auto_runner.Writer")
-    @patch("loom.core.auto_runner.Critic")
-    @patch("loom.core.auto_runner.Manager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.Writer")
+    @patch("opennovel.core.auto_runner.Critic")
+    @patch("opennovel.core.auto_runner.Manager")
     def test_parse_two_chapters(
         self,
         mock_manager_cls: MagicMock,
@@ -297,12 +297,12 @@ class TestParseOutline:
         assert chapters[1][0] == "ch_002"
         assert "冲突" in chapters[1][1]
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
-    @patch("loom.core.auto_runner.Writer")
-    @patch("loom.core.auto_runner.Critic")
-    @patch("loom.core.auto_runner.Manager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.Writer")
+    @patch("opennovel.core.auto_runner.Critic")
+    @patch("opennovel.core.auto_runner.Manager")
     def test_parse_empty_outline(
         self,
         mock_manager_cls: MagicMock,
@@ -320,12 +320,12 @@ class TestParseOutline:
         chapters = runner._parse_outline("")
         assert chapters == []
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
-    @patch("loom.core.auto_runner.Writer")
-    @patch("loom.core.auto_runner.Critic")
-    @patch("loom.core.auto_runner.Manager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.Writer")
+    @patch("opennovel.core.auto_runner.Critic")
+    @patch("opennovel.core.auto_runner.Manager")
     def test_parse_single_chapter(
         self,
         mock_manager_cls: MagicMock,
@@ -347,12 +347,12 @@ class TestParseOutline:
         assert chapters[0][0] == "ch_001"
         assert "开篇" in chapters[0][1]
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
-    @patch("loom.core.auto_runner.Writer")
-    @patch("loom.core.auto_runner.Critic")
-    @patch("loom.core.auto_runner.Manager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.Writer")
+    @patch("opennovel.core.auto_runner.Critic")
+    @patch("opennovel.core.auto_runner.Manager")
     def test_parse_preserves_body_text(
         self,
         mock_manager_cls: MagicMock,
@@ -380,9 +380,9 @@ class TestParseOutline:
 class TestRunChapter:
     """run_chapter 单章创作流程测试。"""
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_run_chapter_success(
         self,
         mock_sm_cls: MagicMock,
@@ -426,9 +426,9 @@ class TestRunChapter:
         assert result.retry_count == 0
         assert result.manager_summary == "第一章摘要：四人相遇"
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_run_chapter_writes_file(
         self,
         mock_sm_cls: MagicMock,
@@ -456,9 +456,9 @@ class TestRunChapter:
         chapter_path = empty_project_root / "draft" / "ch_001.md"
         assert chapter_path.exists()
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_run_chapter_with_previous_context(
         self,
         mock_sm_cls: MagicMock,
@@ -481,7 +481,8 @@ class TestRunChapter:
         runner.manager.update.return_value = make_manager_result()
 
         runner.run_chapter(
-            "ch_002", "冲突爆发",
+            "ch_002",
+            "冲突爆发",
             previous_summary="前一章摘要",
             previous_text="前一章正文末尾",
         )
@@ -494,9 +495,9 @@ class TestRunChapter:
         write_call = runner.writer.write.call_args
         assert write_call[0][2] == "前一章正文末尾"  # previous_chapter_text
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_run_chapter_manager_failure_graceful(
         self,
         mock_sm_cls: MagicMock,
@@ -531,9 +532,9 @@ class TestRunChapter:
 class TestRunChapterRetry:
     """run_chapter 不合格重试流程测试。"""
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_retry_then_pass(
         self,
         mock_sm_cls: MagicMock,
@@ -569,9 +570,9 @@ class TestRunChapterRetry:
         # Critic.evaluate 被调用两次
         assert runner.critic.evaluate.call_count == 2
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_retry_passes_feedback_to_writer(
         self,
         mock_sm_cls: MagicMock,
@@ -624,9 +625,9 @@ class TestRunChapterRetry:
 class TestRunChapterMaxRetries:
     """run_chapter 达到最大重试次数后取最高分版本。"""
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_max_retries_takes_best_score(
         self,
         mock_sm_cls: MagicMock,
@@ -662,9 +663,9 @@ class TestRunChapterMaxRetries:
         # Critic.evaluate 被调用 6 次
         assert runner.critic.evaluate.call_count == 6
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_max_retries_writes_file(
         self,
         mock_sm_cls: MagicMock,
@@ -694,9 +695,9 @@ class TestRunChapterMaxRetries:
         chapter_path = empty_project_root / "draft" / "ch_001.md"
         assert chapter_path.exists()
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_early_pass_skips_remaining_retries(
         self,
         mock_sm_cls: MagicMock,
@@ -735,9 +736,9 @@ class TestRunChapterMaxRetries:
 class TestAutoRunnerHelpers:
     """AutoRunner 辅助方法测试。"""
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_get_active_characters_empty(
         self,
         mock_sm_cls: MagicMock,
@@ -751,9 +752,9 @@ class TestAutoRunnerHelpers:
         chars = runner._get_active_characters()
         assert chars == []
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_get_active_characters_with_files(
         self,
         mock_sm_cls: MagicMock,
@@ -773,9 +774,9 @@ class TestAutoRunnerHelpers:
 
         assert chars == ["char_001", "char_002"]
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_get_previous_summary_first_chapter(
         self,
         mock_sm_cls: MagicMock,
@@ -789,9 +790,9 @@ class TestAutoRunnerHelpers:
         summary = runner._get_previous_summary(0, [])
         assert summary == ""
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_get_previous_summary_with_results(
         self,
         mock_sm_cls: MagicMock,
@@ -816,9 +817,9 @@ class TestAutoRunnerHelpers:
         summary = runner._get_previous_summary(1, [prev_result])
         assert summary == "前一章摘要"
 
-    @patch("loom.core.auto_runner.LLMBus")
-    @patch("loom.core.auto_runner.Retriever")
-    @patch("loom.core.auto_runner.StateManager")
+    @patch("opennovel.core.auto_runner.LLMBus")
+    @patch("opennovel.core.auto_runner.Retriever")
+    @patch("opennovel.core.auto_runner.StateManager")
     def test_get_previous_chapter_text_truncates(
         self,
         mock_sm_cls: MagicMock,

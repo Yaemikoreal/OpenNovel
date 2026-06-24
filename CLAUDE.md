@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概览
 
-**L.O.O.M. (Living Organic Outline Machine) V1.0.1** — 本地优先的长篇小说叙事操作系统。CLI 驱动，Markdown 创作，AI 辅助。
+**OpenNovel () V1.0.1** — 本地优先的长篇小说叙事操作系统。CLI 驱动，Markdown 创作，AI 辅助。
 
 > **当前状态**：设计冻结，Core 层 + 语义层 + 三 Agent 自主创作系统已实现。
 
@@ -19,31 +19,31 @@ pytest                         # 运行全部测试
 pytest -v --tb=short           # 详细输出
 pytest tests/test_parser.py    # 单文件测试
 pytest -k "test_name"          # 按名称过滤测试
-pytest --cov=loom --cov-report=term-missing  # 覆盖率
+pytest --cov=opennovel --cov-report=term-missing  # 覆盖率
 
 # 代码质量
-ruff check loom/ tests/        # 静态检查
-ruff format loom/ tests/       # 格式化
-ruff format --check loom/ tests/  # 检查格式差异
+ruff check opennovel/ tests/        # 静态检查
+ruff format opennovel/ tests/       # 格式化
+ruff format --check opennovel/ tests/  # 检查格式差异
 
 # 类型检查
-mypy loom/                     # 类型注解校验
+mypy opennovel/                     # 类型注解校验
 
 # CLI 入口
-loom --help                    # 查看所有命令
+novel --help                    # 查看所有命令
 ```
 
 ## CLI 命令矩阵
 
 | 命令 | 功能 | 实现状态 |
 |:---|:---|:---|
-| `loom init` | 初始化小说项目目录 | ✅ 完成 |
-| `loom write` | Actor 交互式写作循环 | ✅ 实现，依赖 LLM |
-| `loom stash` | 存入灵感潜意识池 | ✅ 实现，向量索引已接入 |
-| `loom commit` | 提取状态并固化（强制快照+Diff审阅） | ✅ 实现 |
-| `loom rollback` | 回滚错误 commit | ✅ 实现 |
-| `loom diff` | 正文与 Shadow 一致性校验 | ✅ 实现（规则检测） |
-| `loom doctor` | 世界线健康度诊断 | ✅ 实现（基础检测） |
+| `novel init` | 初始化小说项目目录 | ✅ 完成 |
+| `novel write` | Actor 交互式写作循环 | ✅ 实现，依赖 LLM |
+| `novel stash` | 存入灵感潜意识池 | ✅ 实现，向量索引已接入 |
+| `novel commit` | 提取状态并固化（强制快照+Diff审阅） | ✅ 实现 |
+| `novel rollback` | 回滚错误 commit | ✅ 实现 |
+| `novel diff` | 正文与 Shadow 一致性校验 | ✅ 实现（规则检测） |
+| `novel doctor` | 世界线健康度诊断 | ✅ 实现（基础检测） |
 
 ## 架构三层解耦
 
@@ -57,8 +57,8 @@ Semantic Layer (语义层)       → LlamaIndex + BGE-M3 向量索引（可选 s
 
 1. **ID 即锚点** — 全局强制 Canonical IDs（`char_001`、`loc_london`），严禁用角色名做关联
 2. **权威分级** — `[CANON] > [STATE MEMORY] > [SUBCONSCIOUS]`，灵感不可作为设定执行
-3. **人工审核关口** — AI 只能提议，人类否决权（`loom commit` 的 Diff Review）
-4. **操作可逆** — 破坏性写入前必须生成 Snapshot，支持 `loom rollback`
+3. **人工审核关口** — AI 只能提议，人类否决权（`novel commit` 的 Diff Review）
+4. **操作可逆** — 破坏性写入前必须生成 Snapshot，支持 `novel rollback`
 
 ### 三级上下文策略
 
@@ -70,7 +70,7 @@ Semantic Layer (语义层)       → LlamaIndex + BGE-M3 向量索引（可选 s
 
 使用方式：
 ```python
-from loom.core.context_assembler import assemble_actor_context, ContextStrategy, detect_strategy
+from opennovel.core.context_assembler import assemble_actor_context, ContextStrategy, detect_strategy
 
 # 自动检测策略
 strategy = detect_strategy(model_max_window)  # e.g. 128000 → STANDARD
@@ -85,13 +85,13 @@ messages = assemble_actor_context(
 ## 模块结构
 
 ```
-loom/
+opennovel/
 ├── cli/                     # Typer CLI 命令入口
 │   ├── main.py              # 根命令 (init/rollback/diff/doctor)
-│   ├── write.py             # loom write (Gen1 交互式)
-│   ├── auto.py              # loom auto (Gen2 自主创作)
-│   ├── commit.py            # loom commit (5 步审阅流程)
-│   └── stash.py             # loom stash
+│   ├── write.py             # novel write (Gen1 交互式)
+│   ├── auto.py              # novel auto (Gen2 自主创作)
+│   ├── commit.py            # novel commit (5 步审阅流程)
+│   └── stash.py             # novel stash
 ├── core/                    # 核心引擎
 │   ├── llm.py               # LLMBus: LiteLLM + tenacity 重试
 │   ├── context_assembler.py # TokenCounter + 权威分级上下文组装 + 熔断（所有 Agent 通用）（所有 Agent 通用）
@@ -99,7 +99,7 @@ loom/
 │   ├── retriever.py         # Retriever: 双索引语义检索路由 (canon + subconscious)
 │   ├── state_manager.py     # StateManager: 快照/回滚/Diff
 │   ├── parser.py            # Markdown 场景切分 + Token 计数
-│   ├── config.py            # 项目配置管理 (loom.yaml 读写)
+│   ├── config.py            # 项目配置管理 (novel.yaml 读写)
 │   ├── diff_checker.py      # 正文与 Shadow 一致性校验
 │   └── doctor.py            # 世界线健康度诊断
 ├── agents/                  # 代理人格
@@ -133,7 +133,7 @@ loom/
 
 ### 项目初始化后的目录结构
 
-`loom init` 生成的标准小说项目：
+`novel init` 生成的标准小说项目：
 
 ```
 <project>/
@@ -147,8 +147,8 @@ loom/
 ├── subconscious/       # 灵感潜意识池 (SUBCONSCIOUS 层)
 ├── .snapshots/         # 文件级增量快照
 ├── .index/             # 向量索引持久化 (canon/ + subconscious/)
-├── .loom.db            # SQLite 事件账本
-└── loom.yaml           # 项目配置 (model/token_budget)
+├── .novel.db            # SQLite 事件账本
+└── novel.yaml           # 项目配置 (model/token_budget)
 ```
 
 ## 关键代码模式
@@ -242,4 +242,4 @@ networkx              # 因果图 (phase2)
 
 ## demo_novel 项目
 
-`demo_novel/` 包含一个可运行的演示小说项目，`loom.yaml` 配置了 `openai/mimo-v2.5-pro` 模型和 50K token 预算。可用于测试 `loom write` / `loom commit` 等命令的完整流程。
+`demo_novel/` 包含一个可运行的演示小说项目，`novel.yaml` 配置了 `openai/mimo-v2.5-pro` 模型和 50K token 预算。可用于测试 `novel write` / `novel commit` 等命令的完整流程。

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from loom.core.context_assembler import (
+from opennovel.core.context_assembler import (
     BUDGET_RATIOS,
     INPUT_TOKEN_BUDGET,
     TOTAL_TOKEN_BUDGET,
@@ -18,8 +18,8 @@ from loom.core.context_assembler import (
     load_prompt,
     wrap_with_authority_tag,
 )
-from loom.schemas.character import AuthorityLevel
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.schemas.character import AuthorityLevel
+from opennovel.storage.yaml_storage import YAMLStorage
 
 # ── TokenCounter 测试 ──
 

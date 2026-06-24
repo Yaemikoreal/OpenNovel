@@ -8,12 +8,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from loom.agents.director import Director
-from loom.core.auto_runner import AutoRunner, ChapterResult
-from loom.core.config import LoomConfig
-from loom.schemas.director import DirectorAnalysis
-from loom.schemas.evaluation import ChapterEvaluation, DimensionScore
-from loom.schemas.outline import ChapterOutline, SceneBreakdown
+from opennovel.agents.director import Director
+from opennovel.core.auto_runner import AutoRunner, ChapterResult
+from opennovel.core.config import LoomConfig
+from opennovel.schemas.director import DirectorAnalysis
+from opennovel.schemas.evaluation import ChapterEvaluation, DimensionScore
+from opennovel.schemas.outline import ChapterOutline, SceneBreakdown
 
 
 # ── 辅助工具 ──
@@ -183,7 +183,7 @@ class TestDirectorConfig:
         # 需要 mock LLMBus 因为 AutoRunner 会尝试创建
         from unittest.mock import patch
 
-        with patch("loom.core.auto_runner.LLMBus"):
+        with patch("opennovel.core.auto_runner.LLMBus"):
             runner = AutoRunner(project_root=tmp_path, config=config)
         assert runner.director is None
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from loom.core.context_assembler import (
+from opennovel.core.context_assembler import (
     OUTPUT_RESERVE,
     PANORAMIC_SOFT_LIMIT,
     STANDARD_TOKEN_BUDGET,
@@ -13,7 +13,7 @@ from loom.core.context_assembler import (
     assemble_actor_context,
     detect_strategy,
 )
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.storage.yaml_storage import YAMLStorage
 
 # ── ContextStrategy 枚举测试 ──
 

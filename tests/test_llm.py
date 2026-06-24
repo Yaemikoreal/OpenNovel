@@ -3,7 +3,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from loom.core.llm import (
+from opennovel.core.llm import (
     LLMBus,
     extract_text_from_response,
     extract_usage_from_response,
@@ -123,7 +123,7 @@ class TestLLMBusInit:
 class TestLLMBusChat:
     """LLMBus.chat 同步调用测试。"""
 
-    @patch("loom.core.llm.completion")
+    @patch("opennovel.core.llm.completion")
     def test_chat_basic(self, mock_completion: MagicMock) -> None:
         """测试基本同步调用。"""
         mock_completion.return_value = MockResponse("AI 回复")
@@ -140,7 +140,7 @@ class TestLLMBusChat:
             temperature=0.7,
         )
 
-    @patch("loom.core.llm.completion")
+    @patch("opennovel.core.llm.completion")
     def test_chat_with_overrides(self, mock_completion: MagicMock) -> None:
         """测试参数覆盖。"""
         mock_completion.return_value = MockResponse()
@@ -156,7 +156,7 @@ class TestLLMBusChat:
             temperature=0.1,
         )
 
-    @patch("loom.core.llm.completion")
+    @patch("opennovel.core.llm.completion")
     def test_chat_retry_on_failure(self, mock_completion: MagicMock) -> None:
         """测试失败重试。"""
         mock_completion.side_effect = [ConnectionError("网络错误"), MockResponse("重试成功")]
@@ -175,7 +175,7 @@ class TestLLMBusChat:
 class TestLLMBusAchat:
     """LLMBus.achat 异步调用测试。"""
 
-    @patch("loom.core.llm.acompletion", new_callable=AsyncMock)
+    @patch("opennovel.core.llm.acompletion", new_callable=AsyncMock)
     def test_achat_basic(self, mock_acompletion: AsyncMock) -> None:
         """测试基本异步调用。"""
         mock_acompletion.return_value = MockResponse("异步回复")
@@ -194,7 +194,7 @@ class TestLLMBusAchat:
 class TestLLMBusAchatStream:
     """LLMBus.achat_stream 异步流式调用测试。"""
 
-    @patch("loom.core.llm.acompletion", new_callable=AsyncMock)
+    @patch("opennovel.core.llm.acompletion", new_callable=AsyncMock)
     def test_achat_stream_yields_chunks(self, mock_acompletion: AsyncMock) -> None:
         """测试流式调用逐块返回内容。"""
 
@@ -229,7 +229,7 @@ class TestLLMBusAchatStream:
         assert result == ["你好", "世界"]
         mock_acompletion.assert_called_once()
 
-    @patch("loom.core.llm.acompletion", new_callable=AsyncMock)
+    @patch("opennovel.core.llm.acompletion", new_callable=AsyncMock)
     def test_achat_stream_passes_parameters(self, mock_acompletion: AsyncMock) -> None:
         """测试流式调用正确传递参数。"""
 

@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from loom.agents.actor import Actor
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.agents.actor import Actor
+from opennovel.storage.yaml_storage import YAMLStorage
 
 
 class TestActorInit:

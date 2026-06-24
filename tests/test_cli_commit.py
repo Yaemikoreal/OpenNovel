@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from loom.agents.auditor import AuditorAbortError, ExtractionResult
-from loom.schemas.event import EventCreate, EventType
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.agents.auditor import AuditorAbortError, ExtractionResult
+from opennovel.schemas.event import EventCreate, EventType
+from opennovel.storage.yaml_storage import YAMLStorage
 
 # ── Mock 对象 ──
 
@@ -113,13 +113,13 @@ class TestCommitFlow:
     @patch("typer.prompt", return_value="y")
     def test_successful_commit(self, mock_prompt: MagicMock, commit_project: dict) -> None:
         """测试完整 commit 流程：快照→提取→Diff→确认→固化。"""
-        from loom.cli.commit import commit
+        from opennovel.cli.commit import commit
 
         root = commit_project["project_root"]
         llm = MockLLMBus([VALID_EVENTS_JSON])
 
         with (
-            patch("loom.cli.commit.LLMBus", return_value=llm),
+            patch("opennovel.cli.commit.LLMBus", return_value=llm),
             contextlib.suppress(SystemExit),
         ):
             commit(chapter="ch_001.md", path=str(root), model="test")
@@ -131,13 +131,13 @@ class TestCommitFlow:
     @patch("typer.prompt", return_value="n")
     def test_user_cancels_commit(self, mock_prompt: MagicMock, commit_project: dict) -> None:
         """测试用户在审阅步骤选择取消。"""
-        from loom.cli.commit import commit
+        from opennovel.cli.commit import commit
 
         root = commit_project["project_root"]
         llm = MockLLMBus([VALID_EVENTS_JSON])
 
         with (
-            patch("loom.cli.commit.LLMBus", return_value=llm),
+            patch("opennovel.cli.commit.LLMBus", return_value=llm),
             contextlib.suppress(SystemExit),
         ):
             commit(chapter="ch_001.md", path=str(root), model="test")
@@ -150,7 +150,7 @@ class TestCommitFlow:
         """测试章节文件不存在时退出。"""
         import click
 
-        from loom.cli.commit import commit
+        from opennovel.cli.commit import commit
 
         root = commit_project["project_root"]
 
@@ -159,15 +159,15 @@ class TestCommitFlow:
 
     def test_auditor_abort(self, commit_project: dict) -> None:
         """测试 Auditor 触发 abort 时正常退出。"""
-        from loom.cli.commit import commit
+        from opennovel.cli.commit import commit
 
         root = commit_project["project_root"]
         mock_llm = MagicMock()
 
         with (
-            patch("loom.cli.commit.LLMBus", return_value=mock_llm),
+            patch("opennovel.cli.commit.LLMBus", return_value=mock_llm),
             patch(
-                "loom.agents.auditor.Auditor.extract_events_with_retry",
+                "opennovel.agents.auditor.Auditor.extract_events_with_retry",
                 side_effect=AuditorAbortError("abort"),
             ),
             contextlib.suppress(SystemExit),
@@ -176,16 +176,16 @@ class TestCommitFlow:
 
     def test_dirty_result(self, commit_project: dict) -> None:
         """测试脏提交结果时正常退出。"""
-        from loom.cli.commit import commit
+        from opennovel.cli.commit import commit
 
         root = commit_project["project_root"]
         mock_llm = MagicMock()
         dirty_result = ExtractionResult(events=[], success=False, dirty=True, error="failed")
 
         with (
-            patch("loom.cli.commit.LLMBus", return_value=mock_llm),
+            patch("opennovel.cli.commit.LLMBus", return_value=mock_llm),
             patch(
-                "loom.agents.auditor.Auditor.extract_events_with_retry",
+                "opennovel.agents.auditor.Auditor.extract_events_with_retry",
                 return_value=dirty_result,
             ),
             contextlib.suppress(SystemExit),
@@ -194,16 +194,16 @@ class TestCommitFlow:
 
     def test_no_events_detected(self, commit_project: dict) -> None:
         """测试未检测到事件时正常退出。"""
-        from loom.cli.commit import commit
+        from opennovel.cli.commit import commit
 
         root = commit_project["project_root"]
         mock_llm = MagicMock()
         empty_result = ExtractionResult(events=[], success=True)
 
         with (
-            patch("loom.cli.commit.LLMBus", return_value=mock_llm),
+            patch("opennovel.cli.commit.LLMBus", return_value=mock_llm),
             patch(
-                "loom.agents.auditor.Auditor.extract_events_with_retry",
+                "opennovel.agents.auditor.Auditor.extract_events_with_retry",
                 return_value=empty_result,
             ),
             contextlib.suppress(SystemExit),
@@ -217,7 +217,7 @@ class TestCommitStep5Writeback:
     @patch("typer.prompt", return_value="y")
     def test_events_written_to_storage(self, mock_prompt: MagicMock, commit_project: dict) -> None:
         """测试确认后事件被写入状态。"""
-        from loom.cli.commit import commit
+        from opennovel.cli.commit import commit
 
         root = commit_project["project_root"]
 
@@ -241,8 +241,8 @@ class TestCommitStep5Writeback:
         mock_auditor.apply_confirmed_events.return_value = ["evt_001"]
 
         with (
-            patch("loom.cli.commit.LLMBus", return_value=mock_llm),
-            patch("loom.agents.auditor.Auditor", return_value=mock_auditor),
+            patch("opennovel.cli.commit.LLMBus", return_value=mock_llm),
+            patch("opennovel.agents.auditor.Auditor", return_value=mock_auditor),
             contextlib.suppress(SystemExit),
         ):
             commit(chapter="ch_001.md", path=str(root), model="test")
@@ -258,7 +258,7 @@ class TestCommitSnapshotCreation:
 
     def test_snapshot_includes_affected_files(self, commit_project: dict) -> None:
         """测试快照包含章节和活跃角色文件。"""
-        from loom.core.state_manager import StateManager
+        from opennovel.core.state_manager import StateManager
 
         root = commit_project["project_root"]
         manager = StateManager(root)

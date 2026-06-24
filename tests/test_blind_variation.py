@@ -8,12 +8,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from loom.agents.critic import Critic
-from loom.agents.writer import Writer
-from loom.core.auto_runner import AutoRunner, ChapterResult
-from loom.schemas.evaluation import ChapterEvaluation, DimensionScore
-from loom.schemas.outline import ChapterOutline, SceneBreakdown
-from loom.schemas.outline_evaluation import OutlineEvaluation
+from opennovel.agents.critic import Critic
+from opennovel.agents.writer import Writer
+from opennovel.core.auto_runner import AutoRunner, ChapterResult
+from opennovel.schemas.evaluation import ChapterEvaluation, DimensionScore
+from opennovel.schemas.outline import ChapterOutline, SceneBreakdown
+from opennovel.schemas.outline_evaluation import OutlineEvaluation
 
 
 # ── 辅助工具 ──
@@ -146,7 +146,10 @@ class TestThinkVariations:
 
         writer = Writer(llm_bus=bus, retriever=ret, project_root=tmp_path)
         writer.think_variations(
-            "ch_001", "大纲提示", n_variants=3, variation_mode="exploratory",
+            "ch_001",
+            "大纲提示",
+            n_variants=3,
+            variation_mode="exploratory",
         )
 
         # 每个方案至少 1 次 LLM 调用（context assembly 不调用 LLM）
@@ -161,49 +164,53 @@ class TestShouldGenerateVariations:
 
     def test_user_multi_marker(self, tmp_path: Path) -> None:
         """用户 <!-- multi --> 标记强制触发。"""
-        from loom.core.config import LoomConfig
+        from opennovel.core.config import LoomConfig
 
         config = LoomConfig()
         runner = AutoRunner(project_root=tmp_path, config=config)
         should, mode, feedback = runner._should_generate_variations(
-            "章节描述 <!-- multi -->", None,
+            "章节描述 <!-- multi -->",
+            None,
         )
         assert should is True
         assert mode == "exploratory"
 
     def test_low_score_triggers_corrective(self, tmp_path: Path) -> None:
         """前章评分 <80 触发纠错型变异。"""
-        from loom.core.config import LoomConfig
+        from opennovel.core.config import LoomConfig
 
         config = LoomConfig()
         runner = AutoRunner(project_root=tmp_path, config=config)
         prev = _make_chapter_result(score=75)
         should, mode, feedback = runner._should_generate_variations(
-            "正常章节描述", prev,
+            "正常章节描述",
+            prev,
         )
         assert should is True
         assert mode == "corrective"
 
     def test_high_score_no_trigger(self, tmp_path: Path) -> None:
         """前章评分 >=80 不触发（除非有其他条件）。"""
-        from loom.core.config import LoomConfig
+        from opennovel.core.config import LoomConfig
 
         config = LoomConfig()
         runner = AutoRunner(project_root=tmp_path, config=config)
         prev = _make_chapter_result(score=85)
         should, mode, feedback = runner._should_generate_variations(
-            "正常章节描述", prev,
+            "正常章节描述",
+            prev,
         )
         assert should is False
 
     def test_climax_keyword_triggers(self, tmp_path: Path) -> None:
         """高潮关键词触发探索型变异。"""
-        from loom.core.config import LoomConfig
+        from opennovel.core.config import LoomConfig
 
         config = LoomConfig()
         runner = AutoRunner(project_root=tmp_path, config=config)
         should, mode, feedback = runner._should_generate_variations(
-            "第三幕高潮决战", None,
+            "第三幕高潮决战",
+            None,
         )
         assert should is True
         assert mode == "exploratory"

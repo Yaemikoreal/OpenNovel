@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from loom.agents.auditor import Auditor, AuditorAbortError
-from loom.schemas.event import EventCreate, EventType
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.agents.auditor import Auditor, AuditorAbortError
+from opennovel.schemas.event import EventCreate, EventType
+from opennovel.storage.yaml_storage import YAMLStorage
 
 # ── Mock LiteLLM 响应对象（属性访问模式）──
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from loom.core.config import (
+from opennovel.core.config import (
     DEFAULT_MODEL,
     DEFAULT_OUTPUT_RESERVE,
     DEFAULT_TOKEN_BUDGET,
@@ -60,7 +60,7 @@ class TestLoomConfigLoad:
             "token_budget": 32000,
             "output_reserve": 4000,
         }
-        config_path = tmp_path / "loom.yaml"
+        config_path = tmp_path / "novel.yaml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f, allow_unicode=True)
 
@@ -73,7 +73,7 @@ class TestLoomConfigLoad:
     def test_load_partial_config(self, tmp_path: Path) -> None:
         """测试加载部分配置（缺失字段使用默认值）。"""
         config_data = {"model": "gpt-3.5-turbo"}
-        config_path = tmp_path / "loom.yaml"
+        config_path = tmp_path / "novel.yaml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
@@ -89,7 +89,7 @@ class TestLoomConfigLoad:
             "custom_setting": "value",
             "nested": {"key": "val"},
         }
-        config_path = tmp_path / "loom.yaml"
+        config_path = tmp_path / "novel.yaml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
@@ -99,7 +99,7 @@ class TestLoomConfigLoad:
 
     def test_load_empty_yaml(self, tmp_path: Path) -> None:
         """测试加载空 YAML 文件。"""
-        config_path = tmp_path / "loom.yaml"
+        config_path = tmp_path / "novel.yaml"
         config_path.write_text("", encoding="utf-8")
 
         config = LoomConfig.load(tmp_path)
@@ -107,7 +107,7 @@ class TestLoomConfigLoad:
 
     def test_load_corrupted_yaml(self, tmp_path: Path) -> None:
         """测试加载损坏的 YAML 文件返回默认配置。"""
-        config_path = tmp_path / "loom.yaml"
+        config_path = tmp_path / "novel.yaml"
         config_path.write_text("invalid: [yaml: broken", encoding="utf-8")
 
         config = LoomConfig.load(tmp_path)
@@ -122,7 +122,7 @@ class TestLoomConfigSave:
         config = LoomConfig(model="deepseek-chat", token_budget=16000)
         config.save(tmp_path)
 
-        config_path = tmp_path / "loom.yaml"
+        config_path = tmp_path / "novel.yaml"
         assert config_path.exists()
 
         with open(config_path, encoding="utf-8") as f:
@@ -135,7 +135,7 @@ class TestLoomConfigSave:
         config = LoomConfig(extra={"custom": "value"})
         config.save(tmp_path)
 
-        config_path = tmp_path / "loom.yaml"
+        config_path = tmp_path / "novel.yaml"
         with open(config_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         assert data["custom"] == "value"
@@ -148,7 +148,7 @@ class TestLoomConfigSave:
         config2 = LoomConfig(model="gpt-3.5-turbo")
         config2.save(tmp_path)
 
-        config_path = tmp_path / "loom.yaml"
+        config_path = tmp_path / "novel.yaml"
         with open(config_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         assert data["model"] == "gpt-3.5-turbo"

@@ -3,13 +3,13 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from loom.storage.vector import VectorStore, _check_llama_index, _get_embed_model
+from opennovel.storage.vector import VectorStore, _check_llama_index, _get_embed_model
 
 
 class TestCheckLlamaIndex:
     """_check_llama_index 依赖检查测试。"""
 
-    @patch("loom.storage.vector.VectorStoreIndex", create=True)
+    @patch("opennovel.storage.vector.VectorStoreIndex", create=True)
     def test_returns_true_when_available(self, mock_index) -> None:
         """测试 LlamaIndex 可用时返回 True。"""
         assert _check_llama_index() is True
@@ -82,15 +82,15 @@ class TestBuildIndex:
         # 不应抛出异常
         store.build_index(tmp_path / "nonexistent")
 
-    @patch("loom.storage.vector._check_llama_index", return_value=False)
+    @patch("opennovel.storage.vector._check_llama_index", return_value=False)
     def test_no_llama_index_skips_build(self, mock_check, tmp_path: Path) -> None:
         """测试 LlamaIndex 不可用时跳过构建。"""
         store = VectorStore(tmp_path)
         store.build_index(tmp_path / "canon")
         assert store._index is None
 
-    @patch("loom.storage.vector._check_llama_index", return_value=True)
-    @patch("loom.storage.vector._get_embed_model", return_value=None)
+    @patch("opennovel.storage.vector._check_llama_index", return_value=True)
+    @patch("opennovel.storage.vector._get_embed_model", return_value=None)
     def test_build_with_mock_llama_index(self, mock_embed, mock_check, tmp_path: Path) -> None:
         """测试使用 mock LlamaIndex 构建索引。"""
         canon_dir = tmp_path / "canon"
@@ -116,8 +116,8 @@ class TestBuildIndex:
             mock_vsi_cls.from_documents.assert_called_once()
             mock_index.storage_context.persist.assert_called_once()
 
-    @patch("loom.storage.vector._check_llama_index", return_value=True)
-    @patch("loom.storage.vector._get_embed_model", return_value=None)
+    @patch("opennovel.storage.vector._check_llama_index", return_value=True)
+    @patch("opennovel.storage.vector._get_embed_model", return_value=None)
     def test_build_empty_dir(self, mock_embed, mock_check, tmp_path: Path) -> None:
         """测试空目录不构建索引。"""
         empty_dir = tmp_path / "empty"
@@ -144,14 +144,14 @@ class TestLoadIndex:
         store = VectorStore(tmp_path)
         assert store.load_index() is False
 
-    @patch("loom.storage.vector._check_llama_index", return_value=False)
+    @patch("opennovel.storage.vector._check_llama_index", return_value=False)
     def test_no_llama_index_returns_false(self, mock_check, tmp_path: Path) -> None:
         """测试 LlamaIndex 不可用时返回 False。"""
         store = VectorStore(tmp_path)
         (tmp_path / ".index").mkdir()
         assert store.load_index() is False
 
-    @patch("loom.storage.vector._check_llama_index", return_value=True)
+    @patch("opennovel.storage.vector._check_llama_index", return_value=True)
     def test_load_success(self, mock_check, tmp_path: Path) -> None:
         """测试成功加载索引。"""
         index_dir = tmp_path / ".index"
@@ -169,7 +169,7 @@ class TestLoadIndex:
             assert result is True
             assert store._index is mock_index
 
-    @patch("loom.storage.vector._check_llama_index", return_value=True)
+    @patch("opennovel.storage.vector._check_llama_index", return_value=True)
     def test_load_failure(self, mock_check, tmp_path: Path) -> None:
         """测试加载失败返回 False。"""
         index_dir = tmp_path / ".index"

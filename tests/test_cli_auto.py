@@ -1,4 +1,4 @@
-"""cli/auto 模块测试 - loom auto 命令。"""
+"""cli/auto 模块测试 - novel auto 命令。"""
 
 from pathlib import Path
 
@@ -6,14 +6,14 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from loom.cli.main import app
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.cli.main import app
+from opennovel.storage.yaml_storage import YAMLStorage
 
 runner = CliRunner()
 
 
 class TestAutoCommandHelp:
-    """loom auto --help 测试。"""
+    """novel auto --help 测试。"""
 
     def test_auto_help_contains_keyword(self) -> None:
         """测试 --help 输出包含 '三 Agent' 关键字。"""
@@ -23,14 +23,14 @@ class TestAutoCommandHelp:
 
 
 class TestAutoCommandNoOutline:
-    """loom auto 大纲文件不存在时的错误处理测试。"""
+    """novel auto 大纲文件不存在时的错误处理测试。"""
 
     def test_auto_no_outline_file(self, tmp_path: Path) -> None:
         """测试大纲文件不存在时报错退出。"""
         project_dir = tmp_path / "project"
         project_dir.mkdir()
 
-        # 创建 loom.yaml 配置
+        # 创建 novel.yaml 配置
         config = {
             "version": "1.0.1",
             "model": "gpt-4",
@@ -39,7 +39,7 @@ class TestAutoCommandNoOutline:
             "words_per_chapter": 3000,
             "outline": "outlines/story.md",
         }
-        config_path = project_dir / "loom.yaml"
+        config_path = project_dir / "novel.yaml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
 
@@ -53,7 +53,7 @@ class TestAutoCommandNoOutline:
         project_dir = tmp_path / "project"
         project_dir.mkdir()
 
-        # 创建 loom.yaml 配置
+        # 创建 novel.yaml 配置
         config = {
             "version": "1.0.1",
             "model": "gpt-4",
@@ -62,7 +62,7 @@ class TestAutoCommandNoOutline:
             "words_per_chapter": 3000,
             "outline": "outlines/story.md",
         }
-        config_path = project_dir / "loom.yaml"
+        config_path = project_dir / "novel.yaml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
 
@@ -78,7 +78,7 @@ class TestAutoCommandNoOutline:
 
 
 class TestAutoCommandDryRun:
-    """loom auto --dry-run 测试。"""
+    """novel auto --dry-run 测试。"""
 
     def _create_project_structure(self, project_dir: Path) -> None:
         """创建完整的项目结构用于 dry-run 测试。
@@ -86,7 +86,7 @@ class TestAutoCommandDryRun:
         Args:
             project_dir: 项目根目录路径
         """
-        # 创建 loom.yaml 配置
+        # 创建 novel.yaml 配置
         config = {
             "version": "1.0.1",
             "model": "gpt-4",
@@ -95,7 +95,7 @@ class TestAutoCommandDryRun:
             "words_per_chapter": 3000,
             "outline": "outlines/story.md",
         }
-        config_path = project_dir / "loom.yaml"
+        config_path = project_dir / "novel.yaml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
 

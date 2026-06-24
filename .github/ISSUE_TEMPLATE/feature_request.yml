@@ -1,5 +1,5 @@
 name: ✨ 功能建议
-description: 为 L.O.O.M. 提出一个新想法
+description: 为 OpenNovel 提出一个新想法
 title: "[Feature]："
 labels: ["enhancement"]
 body:
@@ -23,7 +23,7 @@ body:
     attributes:
       label: 解决方案
       description: 你期望的解决方案是什么样的？
-      placeholder: 希望 L.O.O.M. 能够自动...
+      placeholder: 希望 OpenNovel 能够自动...
     validations:
       required: true
 
@@ -66,5 +66,5 @@ body:
       options:
         - label: 我已搜索现有 Issues，没有重复建议
           required: true
-        - label: 这个功能符合 L.O.O.M. 的设计理念（Human-first, AI-assist）
+        - label: 这个功能符合 OpenNovel 的设计理念（Human-first, AI-assist）
           required: true

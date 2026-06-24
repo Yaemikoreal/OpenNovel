@@ -1,6 +1,6 @@
 """parser 模块测试 - Markdown 文本切分。"""
 
-from loom.core.parser import (
+from opennovel.core.parser import (
     count_text_tokens,
     split_chapter_into_scenes,
     truncate_to_budget,

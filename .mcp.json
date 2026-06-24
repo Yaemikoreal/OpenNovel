@@ -1,7 +1,7 @@
 {
   "mcpServers": {
-    "loom": {
-      "command": "loom-mcp",
+    "novel": {
+      "command": "novel-mcp",
       "args": []
     }
   }

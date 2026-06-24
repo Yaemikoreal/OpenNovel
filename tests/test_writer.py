@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from loom.agents.writer import Writer
-from loom.schemas.outline import ChapterOutline
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.agents.writer import Writer
+from opennovel.schemas.outline import ChapterOutline
+from opennovel.storage.yaml_storage import YAMLStorage
 
 # ── Mock LiteLLM 响应对象（属性访问模式）──
 
@@ -157,7 +157,10 @@ class TestWriterInit:
         bus = MagicMock()
         ret = MagicMock()
         writer = Writer(llm_bus=bus, retriever=ret, project_root=empty_project_root)
-        assert writer.prompt_path == Path(__file__).parent.parent / "loom" / "prompts" / "writer.v1.md"
+        assert (
+            writer.prompt_path
+            == Path(__file__).parent.parent / "opennovel" / "prompts" / "writer.v1.md"
+        )
 
     def test_custom_prompt_path(self, empty_project_root: Path) -> None:
         """测试自定义 prompt 路径。"""
@@ -165,8 +168,10 @@ class TestWriterInit:
         ret = MagicMock()
         custom = empty_project_root / "custom_prompt.md"
         writer = Writer(
-            llm_bus=bus, retriever=ret,
-            project_root=empty_project_root, prompt_path=custom,
+            llm_bus=bus,
+            retriever=ret,
+            project_root=empty_project_root,
+            prompt_path=custom,
         )
         assert writer.prompt_path == custom
 
@@ -184,7 +189,8 @@ class TestWriterInit:
         bus = MagicMock()
         ret = MagicMock()
         writer = Writer(
-            llm_bus=bus, retriever=ret,
+            llm_bus=bus,
+            retriever=ret,
             project_root=empty_project_root,
             creative_direction="暗黑风格",
         )
@@ -195,7 +201,8 @@ class TestWriterInit:
         bus = MagicMock()
         ret = MagicMock()
         writer = Writer(
-            llm_bus=bus, retriever=ret,
+            llm_bus=bus,
+            retriever=ret,
             project_root=empty_project_root,
             words_per_chapter=5000,
         )
@@ -271,9 +278,7 @@ class TestWriterThink:
         assert len(call_args) >= 2
         assert all("role" in m and "content" in m for m in call_args)
 
-    def test_think_with_markdown_code_block(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_think_with_markdown_code_block(self, empty_project_root: Path) -> None:
         """测试 LLM 返回被 markdown 代码块包裹的 JSON。"""
         outline_json = """```json
 {
@@ -340,11 +345,13 @@ class TestWriterThinkRetry:
         self, empty_project_root: Path, invalid_json_response: str
     ) -> None:
         """测试所有重试都失败后抛出 RuntimeError。"""
-        llm_bus = MockLLMBus([
-            invalid_json_response,
-            invalid_json_response,
-            invalid_json_response,
-        ])
+        llm_bus = MockLLMBus(
+            [
+                invalid_json_response,
+                invalid_json_response,
+                invalid_json_response,
+            ]
+        )
         ret = MagicMock()
         ret.query_canon.return_value = ""
         ret.query_subconscious.return_value = ""
@@ -358,9 +365,7 @@ class TestWriterThinkRetry:
             writer.think("ch_001", "大纲提示")
         assert llm_bus.call_count == 3
 
-    def test_empty_text_retry(
-        self, empty_project_root: Path, valid_outline_json: str
-    ) -> None:
+    def test_empty_text_retry(self, empty_project_root: Path, valid_outline_json: str) -> None:
         """测试 LLM 返回空文本后重试成功。"""
         llm_bus = MockLLMBus(["", valid_outline_json])
         ret = MagicMock()
@@ -482,7 +487,8 @@ class TestWriterRevise:
             project_root=empty_project_root,
         )
         result = writer.revise(
-            "ch_001", sample_outline,
+            "ch_001",
+            sample_outline,
             current_text="原始正文",
             feedback="角色对话需要更自然",
         )
@@ -505,7 +511,8 @@ class TestWriterRevise:
             project_root=empty_project_root,
         )
         writer.revise(
-            "ch_001", sample_outline,
+            "ch_001",
+            sample_outline,
             current_text="原始正文",
             feedback="情节转折太突兀",
         )
@@ -531,7 +538,8 @@ class TestWriterRevise:
         )
         with pytest.raises(RuntimeError, match="Writer 修订返回空文本"):
             writer.revise(
-                "ch_001", sample_outline,
+                "ch_001",
+                sample_outline,
                 current_text="原始正文",
                 feedback="需要修改",
             )
@@ -548,7 +556,8 @@ class TestWriterLoadPrompt:
         bus = MagicMock()
         ret = MagicMock()
         writer = Writer(
-            llm_bus=bus, retriever=ret,
+            llm_bus=bus,
+            retriever=ret,
             project_root=empty_project_root,
             prompt_path=empty_project_root / "nonexistent.md",
         )
@@ -562,7 +571,8 @@ class TestWriterLoadPrompt:
         bus = MagicMock()
         ret = MagicMock()
         writer = Writer(
-            llm_bus=bus, retriever=ret,
+            llm_bus=bus,
+            retriever=ret,
             project_root=empty_project_root,
             prompt_path=prompt_path,
         )

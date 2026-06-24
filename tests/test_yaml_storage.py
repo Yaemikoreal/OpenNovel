@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from loom.storage.yaml_storage import ConflictError, YAMLStorage
+from opennovel.storage.yaml_storage import ConflictError, YAMLStorage
 
 
 @pytest.fixture
@@ -181,7 +181,7 @@ class TestAtomicWriteCleanup:
 
         # 模拟 os.replace 抛出异常，触发 except 分支
         with (
-            patch("loom.storage.yaml_storage.os.replace", side_effect=OSError("模拟磁盘错误")),
+            patch("opennovel.storage.yaml_storage.os.replace", side_effect=OSError("模拟磁盘错误")),
             pytest.raises(OSError, match="模拟磁盘错误"),
         ):
             storage.write_markdown_file(file_path, {"id": "test"}, "新内容")
@@ -204,8 +204,8 @@ class TestAtomicWriteCleanup:
 
         # 模拟 os.replace 失败，同时 os.path.exists 返回 False（临时文件已消失）
         with (
-            patch("loom.storage.yaml_storage.os.replace", side_effect=OSError("错误")),
-            patch("loom.storage.yaml_storage.os.path.exists", return_value=False),
+            patch("opennovel.storage.yaml_storage.os.replace", side_effect=OSError("错误")),
+            patch("opennovel.storage.yaml_storage.os.path.exists", return_value=False),
             pytest.raises(OSError),
         ):
             storage.write_markdown_file(file_path, {"id": "test"}, "内容")

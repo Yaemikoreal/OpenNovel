@@ -3,9 +3,9 @@
 import pytest
 from pydantic import ValidationError
 
-from loom.schemas.evaluation import ChapterEvaluation, DimensionScore
-from loom.schemas.manager_update import CharacterUpdate, EventRecord, ManagerUpdateResult
-from loom.schemas.outline import ChapterOutline, SceneBreakdown
+from opennovel.schemas.evaluation import ChapterEvaluation, DimensionScore
+from opennovel.schemas.manager_update import CharacterUpdate, EventRecord, ManagerUpdateResult
+from opennovel.schemas.outline import ChapterOutline, SceneBreakdown
 
 
 class TestSceneBreakdown:

@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from loom.core.doctor import DiagnosticItem, DiagnosticLevel, Doctor
-from loom.schemas.event import EventCreate, EventType
-from loom.storage.sqlite import EventStore
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.core.doctor import DiagnosticItem, DiagnosticLevel, Doctor
+from opennovel.schemas.event import EventCreate, EventType
+from opennovel.storage.sqlite import EventStore
+from opennovel.storage.yaml_storage import YAMLStorage
 
 
 @pytest.fixture
@@ -185,7 +185,7 @@ class TestEventLedgerHealth:
 
     def test_event_references_missing_character(self, project_root: Path) -> None:
         """事件引用不存在的角色 → 应检测到。"""
-        db_path = project_root / ".loom.db"
+        db_path = project_root / ".novel.db"
         store = EventStore(db_path)
 
         # 写入一个引用不存在角色的事件
@@ -331,8 +331,8 @@ class TestEdgeCases:
 
     def test_event_store_read_failure(self, project_root: Path) -> None:
         """测试事件账本读取失败时的处理（覆盖 lines 253-255）。"""
-        # 创建一个 .loom.db 文件，但内容为无效数据
-        db_path = project_root / ".loom.db"
+        # 创建一个 .novel.db 文件，但内容为无效数据
+        db_path = project_root / ".novel.db"
         db_path.write_bytes(b"not a valid sqlite database")
 
         doctor = Doctor(project_root)

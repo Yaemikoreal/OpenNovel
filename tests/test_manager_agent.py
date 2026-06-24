@@ -7,10 +7,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from loom.agents.manager import Manager
-from loom.schemas.event import EventType
-from loom.schemas.manager_update import ManagerUpdateResult
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.agents.manager import Manager
+from opennovel.schemas.event import EventType
+from opennovel.schemas.manager_update import ManagerUpdateResult
+from opennovel.storage.yaml_storage import YAMLStorage
 
 # ── Mock LiteLLM 响应对象（属性访问模式）──
 
@@ -227,9 +227,7 @@ class TestManagerUpdate:
         assert event.event_type == EventType.EMOTION_SHIFT
         assert event.causal_pressure == 0.5
 
-    def test_update_with_empty_updates(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_update_with_empty_updates(self, empty_project_root: Path) -> None:
         """测试无变更时 update 正常返回。"""
         response = json.dumps(
             {
@@ -255,9 +253,7 @@ class TestManagerUpdate:
         mock_sm.apply_character_diff.assert_not_called()
         mock_sm.apply_event.assert_not_called()
 
-    def test_update_with_multiple_character_updates(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_update_with_multiple_character_updates(self, empty_project_root: Path) -> None:
         """测试多个角色状态更新。"""
         response = json.dumps(
             {
@@ -293,9 +289,7 @@ class TestManagerUpdate:
         assert len(result.character_updates) == 2
         assert mock_sm.apply_character_diff.call_count == 2
 
-    def test_update_with_markdown_code_block(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_update_with_markdown_code_block(self, empty_project_root: Path) -> None:
         """测试 LLM 返回被 markdown 代码块包裹的 JSON。"""
         response = """```json
 {
@@ -322,7 +316,9 @@ class TestManagerUpdate:
 class TestManagerUpdateRetry:
     """Manager JSON 解析失败重试测试。"""
 
-    def test_retry_then_success(self, empty_project_root: Path, valid_manager_response: str) -> None:
+    def test_retry_then_success(
+        self, empty_project_root: Path, valid_manager_response: str
+    ) -> None:
         """测试第一次 JSON 解析失败后重试成功。"""
         llm_bus = MockLLMBus(
             [
@@ -438,9 +434,7 @@ class TestManagerApplyUpdates:
         mock_sm.apply_event.assert_called_once()
         assert event_ids == ["evt_ch001_001"]
 
-    def test_apply_updates_continues_on_character_error(
-        self, empty_project_root: Path
-    ) -> None:
+    def test_apply_updates_continues_on_character_error(self, empty_project_root: Path) -> None:
         """测试角色更新失败时不阻塞后续更新。"""
         mock_sm = MagicMock()
         mock_sm.apply_character_diff.side_effect = FileNotFoundError("角色不存在")

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from loom.schemas.event import EventCreate, EventType
-from loom.storage.sqlite import EventStore
+from opennovel.schemas.event import EventCreate, EventType
+from opennovel.storage.sqlite import EventStore
 
 
 @pytest.fixture

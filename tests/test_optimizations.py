@@ -12,13 +12,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from loom.agents.critic import Critic
-from loom.agents.writer import Writer
-from loom.core.auto_runner import AutoRunner, ChapterResult, RunReport
-from loom.core.context_assembler import assemble_context, assemble_actor_context
-from loom.core.diff_checker import Mismatch, Severity
-from loom.schemas.evaluation import AnchoredIssue, ChapterEvaluation, DimensionScore
-from loom.schemas.outline import ChapterOutline, SceneBreakdown
+from opennovel.agents.critic import Critic
+from opennovel.agents.writer import Writer
+from opennovel.core.auto_runner import AutoRunner, ChapterResult, RunReport
+from opennovel.core.context_assembler import assemble_context, assemble_actor_context
+from opennovel.core.diff_checker import Mismatch, Severity
+from opennovel.schemas.evaluation import AnchoredIssue, ChapterEvaluation, DimensionScore
+from opennovel.schemas.outline import ChapterOutline, SceneBreakdown
 
 
 # ── 辅助工具 ──
@@ -189,9 +189,7 @@ class TestChapterEvaluationAnchored:
 class TestAssembleContext:
     """assemble_context() 通用上下文组装测试。"""
 
-    def test_actor_context_backward_compat(
-        self, tmp_path: Path
-    ) -> None:
+    def test_actor_context_backward_compat(self, tmp_path: Path) -> None:
         """assemble_actor_context 行为不变（回归测试）。"""
         # 创建最小项目结构
         canon_dir = tmp_path / "canon"
@@ -228,9 +226,7 @@ class TestAssembleContext:
         assert messages[-1]["role"] == "user"
         assert "CONTINUE:" in messages[-1]["content"]
 
-    def test_assemble_context_custom_task(
-        self, tmp_path: Path
-    ) -> None:
+    def test_assemble_context_custom_task(self, tmp_path: Path) -> None:
         """assemble_context 使用自定义 task_message。"""
         prompt_dir = tmp_path / "prompts"
         prompt_dir.mkdir()
@@ -268,8 +264,7 @@ class TestAssembleContext:
 
         # 找到包含 CANON 标签的消息
         canon_msgs = [
-            m for m in messages
-            if "[CANON | IMMUTABLE | HIGH AUTHORITY]" in m.get("content", "")
+            m for m in messages if "[CANON | IMMUTABLE | HIGH AUTHORITY]" in m.get("content", "")
         ]
         assert len(canon_msgs) > 0
         assert "魔法消耗寿命" in canon_msgs[0]["content"]
@@ -363,7 +358,7 @@ class TestFeedbackConstruction:
             for issue in eval_.anchored_issues:
                 parts.append(
                     f"[{issue.severity.upper()}] [{issue.dimension}]\n"
-                    f"  原文: \"{issue.quote}\"\n"
+                    f'  原文: "{issue.quote}"\n'
                     f"  问题: {issue.problem}\n"
                     f"  建议: {issue.suggestion}"
                 )

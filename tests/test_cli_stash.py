@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from loom.cli.stash import stash_app
+from opennovel.cli.stash import stash_app
 
 runner = CliRunner()
 
@@ -20,7 +20,7 @@ def project_root(tmp_path: Path) -> Path:
 
 
 class TestStashCommand:
-    """loom stash 命令测试。"""
+    """novel stash 命令测试。"""
 
     def test_stash_basic(self, project_root: Path) -> None:
         """测试基本灵感存入。"""
@@ -40,7 +40,7 @@ class TestStashCommand:
 
     def test_stash_with_tags(self, project_root: Path) -> None:
         """测试带标签的灵感存入（直接调用函数绕过 CliRunner 解析问题）。"""
-        from loom.cli.stash import stash
+        from opennovel.cli.stash import stash
 
         stash(text="这是一句金句", tags=["金句", "哲学"], path=str(project_root))
 

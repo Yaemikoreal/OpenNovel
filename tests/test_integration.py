@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.storage.yaml_storage import YAMLStorage
 
 # ── Mock LLM ──
 
@@ -73,7 +73,7 @@ def full_project(tmp_path: Path) -> Path:
     project_root.mkdir()
 
     # 模拟 loom init
-    from loom.cli.main import init
+    from opennovel.cli.main import init
 
     init(str(project_root))
 
@@ -88,7 +88,7 @@ class TestInitThenDiff:
 
     def test_init_project_diff_clean(self, full_project: Path) -> None:
         """测试 init 后的项目 diff 应无不一致。"""
-        from loom.core.diff_checker import DiffChecker
+        from opennovel.core.diff_checker import DiffChecker
 
         checker = DiffChecker(full_project)
         mismatches = checker.check_all()
@@ -102,7 +102,7 @@ class TestInitThenDoctor:
 
     def test_init_project_doctor_ok(self, full_project: Path) -> None:
         """测试 init 后的项目 doctor 诊断。"""
-        from loom.core.doctor import Doctor
+        from opennovel.core.doctor import Doctor
 
         doc = Doctor(full_project)
         items = doc.diagnose()
@@ -117,7 +117,7 @@ class TestWriteThenCommit:
     @patch("typer.prompt", return_value="y")
     def test_write_and_commit_flow(self, mock_prompt: MagicMock, full_project: Path) -> None:
         """测试 write 续写 → commit 提取的完整流程。"""
-        from loom.cli.commit import commit
+        from opennovel.cli.commit import commit
 
         chapter_path = full_project / "draft" / "ch_001.md"
         storage = YAMLStorage()
@@ -129,7 +129,7 @@ class TestWriteThenCommit:
         # commit：提取事件
         llm = MockLLMBus([VALID_EVENTS_JSON])
         with (
-            patch("loom.cli.commit.LLMBus", return_value=llm),
+            patch("opennovel.cli.commit.LLMBus", return_value=llm),
             contextlib.suppress(SystemExit),
         ):
             commit(chapter="ch_001.md", path=str(full_project), model="test")
@@ -144,7 +144,7 @@ class TestCommitThenRollback:
 
     def test_commit_then_rollback(self, full_project: Path) -> None:
         """测试 commit 固化 → rollback 回滚的完整流程。"""
-        from loom.core.state_manager import StateManager
+        from opennovel.core.state_manager import StateManager
 
         chapter_path = full_project / "draft" / "ch_001.md"
         char_path = full_project / "characters" / "char_001.md"
@@ -182,7 +182,7 @@ class TestStashThenRetriever:
 
     def test_stash_writes_to_subconscious(self, full_project: Path) -> None:
         """测试 stash 写入 subconscious/lines.md。"""
-        from loom.core.retriever import Retriever
+        from opennovel.core.retriever import Retriever
 
         ret = Retriever(full_project)
 
@@ -198,7 +198,7 @@ class TestStashThenRetriever:
 
     def test_stash_multiple_entries(self, full_project: Path) -> None:
         """测试多次存入灵感。"""
-        from loom.core.retriever import Retriever
+        from opennovel.core.retriever import Retriever
 
         ret = Retriever(full_project)
 
@@ -263,10 +263,10 @@ class TestEventLedgerFlow:
 
     def test_event_crud(self, full_project: Path) -> None:
         """测试事件的创建→查询→删除。"""
-        from loom.schemas.event import EventCreate, EventType
-        from loom.storage.sqlite import EventStore
+        from opennovel.schemas.event import EventCreate, EventType
+        from opennovel.storage.sqlite import EventStore
 
-        store = EventStore(full_project / ".loom.db")
+        store = EventStore(full_project / ".novel.db")
 
         # 创建事件
         event = EventCreate(
@@ -298,7 +298,7 @@ class TestSnapshotLifecycle:
         """测试创建→列表→回滚的完整生命周期。"""
         import time
 
-        from loom.core.state_manager import StateManager
+        from opennovel.core.state_manager import StateManager
 
         manager = StateManager(full_project)
         chapter_path = full_project / "draft" / "ch_001.md"

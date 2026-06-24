@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢你对 L.O.O.M. 项目感兴趣！本文档指导你如何参与贡献。
+感谢你对 OpenNovel 项目感兴趣！本文档指导你如何参与贡献。
 
 ## 行为准则
 
@@ -14,8 +14,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/Yaemikoreal/LOOM.git
-cd LOOM
+git clone https://github.com/Yaemikoreal/OpenNovel.git
+cd OpenNovel
 
 # 创建虚拟环境
 python -m venv .venv
@@ -26,7 +26,7 @@ source .venv/bin/activate  # Linux/macOS
 pip install -e ".[dev]"
 
 # 验证安装
-loom --help
+novel --help
 ```
 
 ## 代码规范

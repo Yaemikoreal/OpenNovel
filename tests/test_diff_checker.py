@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
-from loom.core.diff_checker import DiffChecker, Mismatch, Severity
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.core.diff_checker import DiffChecker, Mismatch, Severity
+from opennovel.storage.yaml_storage import YAMLStorage
 
 
 @pytest.fixture

@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from loom.core.retriever import Retriever
+from opennovel.core.retriever import Retriever
 
 
 class TestRetrieverInit:
@@ -34,7 +34,7 @@ class TestBuildCanonIndex:
         ret = Retriever(tmp_path)
         ret.build_canon_index()  # 不应抛出异常
 
-    @patch("loom.core.retriever.VectorStore")
+    @patch("opennovel.core.retriever.VectorStore")
     def test_build_canon_calls_store(self, mock_vs_cls, tmp_path: Path) -> None:
         """测试构建 canon 索引调用 VectorStore。"""
         canon_dir = tmp_path / "canon"
@@ -56,7 +56,7 @@ class TestBuildSubconsciousIndex:
         ret = Retriever(tmp_path)
         ret.build_subconscious_index()
 
-    @patch("loom.core.retriever.VectorStore")
+    @patch("opennovel.core.retriever.VectorStore")
     def test_build_subconscious_calls_store(self, mock_vs_cls, tmp_path: Path) -> None:
         """测试构建潜意识索引调用 VectorStore。"""
         sub_dir = tmp_path / "subconscious"

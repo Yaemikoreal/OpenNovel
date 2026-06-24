@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from loom.agents.critic import Critic
-from loom.schemas.evaluation import ChapterEvaluation
-from loom.schemas.outline import ChapterOutline
+from opennovel.agents.critic import Critic
+from opennovel.schemas.evaluation import ChapterEvaluation
+from opennovel.schemas.outline import ChapterOutline
 
 # ── Mock LiteLLM 响应对象（属性访问模式）──
 
@@ -184,7 +184,10 @@ class TestCriticInit:
         """测试默认 prompt 路径指向 prompts/critic.v1.md。"""
         bus = MagicMock()
         critic = Critic(llm_bus=bus, project_root=empty_project_root)
-        assert critic.prompt_path == Path(__file__).parent.parent / "loom" / "prompts" / "critic.v1.md"
+        assert (
+            critic.prompt_path
+            == Path(__file__).parent.parent / "opennovel" / "prompts" / "critic.v1.md"
+        )
 
     def test_custom_prompt_path(self, empty_project_root: Path) -> None:
         """测试自定义 prompt 路径。"""
@@ -334,11 +337,13 @@ class TestCriticEvaluateRetry:
         invalid_json_response: str,
     ) -> None:
         """测试所有重试都失败后抛出 RuntimeError。"""
-        llm_bus = MockLLMBus([
-            invalid_json_response,
-            invalid_json_response,
-            invalid_json_response,
-        ])
+        llm_bus = MockLLMBus(
+            [
+                invalid_json_response,
+                invalid_json_response,
+                invalid_json_response,
+            ]
+        )
         critic = Critic(
             llm_bus=llm_bus,  # type: ignore[arg-type]
             project_root=empty_project_root,

@@ -5,14 +5,14 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from loom.cli.main import app
-from loom.storage.yaml_storage import YAMLStorage
+from opennovel.cli.main import app
+from opennovel.storage.yaml_storage import YAMLStorage
 
 runner = CliRunner()
 
 
 class TestInitCommand:
-    """loom init 命令测试。"""
+    """novel init 命令测试。"""
 
     def test_init_creates_directories(self, tmp_path: Path) -> None:
         """测试 init 创建标准目录结构。"""
@@ -40,7 +40,7 @@ class TestInitCommand:
         assert (project_dir / "characters" / "char_001.md").exists()
         assert (project_dir / "canon" / "world_rules.md").exists()
         assert (project_dir / "draft" / "ch_001.md").exists()
-        assert (project_dir / "loom.yaml").exists()
+        assert (project_dir / "novel.yaml").exists()
 
     def test_init_idempotent(self, tmp_path: Path) -> None:
         """测试 init 幂等性（重复运行不报错）。"""
@@ -62,11 +62,11 @@ class TestInitCommand:
 
 
 class TestDiffCommand:
-    """loom diff 命令测试。"""
+    """novel diff 命令测试。"""
 
     def test_diff_no_chapters(self, tmp_path: Path) -> None:
         """测试无章节文件时正常退出（直接调用函数）。"""
-        from loom.core.diff_checker import DiffChecker
+        from opennovel.core.diff_checker import DiffChecker
 
         project_dir = tmp_path / "project"
         project_dir.mkdir()
@@ -89,7 +89,7 @@ class TestDiffCommand:
 
 
 class TestRollbackCommand:
-    """loom rollback 命令测试。"""
+    """novel rollback 命令测试。"""
 
     def test_rollback_nonexistent_snapshot(self, tmp_path: Path) -> None:
         """测试回滚不存在的快照。"""
@@ -104,7 +104,7 @@ class TestRollbackCommand:
 
 
 class TestDiffWithChapter:
-    """loom diff 指定章节测试。"""
+    """novel diff 指定章节测试。"""
 
     def test_diff_with_valid_chapter(self, tmp_path: Path) -> None:
         """测试对有效章节运行 diff。"""
@@ -134,7 +134,7 @@ class TestDiffWithChapter:
 
     def test_diff_all_chapters(self, tmp_path: Path) -> None:
         """测试不指定章节时扫描全部。"""
-        from loom.core.diff_checker import DiffChecker
+        from opennovel.core.diff_checker import DiffChecker
 
         project_dir = tmp_path / "project"
         project_dir.mkdir()
@@ -148,7 +148,7 @@ class TestDiffWithChapter:
 
 
 class TestDoctorCommand:
-    """loom doctor 命令测试。"""
+    """novel doctor 命令测试。"""
 
     def test_doctor_empty_project(self, tmp_path: Path) -> None:
         """测试空项目诊断。"""

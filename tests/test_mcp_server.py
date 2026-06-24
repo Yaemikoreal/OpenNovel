@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from loom.mcp_server import (
+from opennovel.mcp_server import (
     _handle_auto_create,
     _handle_get_status,
     _handle_init_project,
@@ -54,7 +54,7 @@ class TestInitProject:
         assert (tmp_path / "characters" / "char_001.md").exists()
         assert (tmp_path / "canon" / "world_rules.md").exists()
         assert (tmp_path / "draft" / "ch_001.md").exists()
-        assert (tmp_path / "loom.yaml").exists()
+        assert (tmp_path / "novel.yaml").exists()
 
     @pytest.mark.anyio
     async def test_init_idempotent(self, tmp_path):
@@ -97,14 +97,16 @@ class TestWriteChapter:
         assert "错误" in result or "error" in result.lower()
 
     @pytest.mark.anyio
-    @patch("loom.mcp_server.Writer")
-    @patch("loom.mcp_server.Critic")
-    @patch("loom.mcp_server.LLMBus")
-    @patch("loom.mcp_server.Retriever")
-    async def test_write_chapter_success(self, mock_retriever, mock_bus, mock_critic_cls, mock_writer_cls, tmp_path):
+    @patch("opennovel.mcp_server.Writer")
+    @patch("opennovel.mcp_server.Critic")
+    @patch("opennovel.mcp_server.LLMBus")
+    @patch("opennovel.mcp_server.Retriever")
+    async def test_write_chapter_success(
+        self, mock_retriever, mock_bus, mock_critic_cls, mock_writer_cls, tmp_path
+    ):
         """成功创作章节。"""
-        from loom.schemas.evaluation import ChapterEvaluation, DimensionScore
-        from loom.schemas.outline import ChapterOutline, SceneBreakdown
+        from opennovel.schemas.evaluation import ChapterEvaluation, DimensionScore
+        from opennovel.schemas.outline import ChapterOutline, SceneBreakdown
 
         # 初始化项目
         await _handle_init_project({"path": str(tmp_path)})
@@ -114,11 +116,15 @@ class TestWriteChapter:
             chapter_id="ch_001",
             title="测试章节",
             summary="测试概要",
-            scenes=[SceneBreakdown(
-                scene_id="s1", description="测试场景",
-                characters_involved=["char_001"], emotional_tone="平静",
-                estimated_words=1000,
-            )],
+            scenes=[
+                SceneBreakdown(
+                    scene_id="s1",
+                    description="测试场景",
+                    characters_involved=["char_001"],
+                    emotional_tone="平静",
+                    estimated_words=1000,
+                )
+            ],
             character_arcs={"char_001": "从平静到紧张"},
             key_plot_points=["关键事件"],
             narrative_rhythm="前松后紧",
@@ -147,11 +153,13 @@ class TestWriteChapter:
         mock_critic.evaluate.return_value = mock_evaluation
         mock_critic_cls.return_value = mock_critic
 
-        result = await _handle_write_chapter({
-            "path": str(tmp_path),
-            "chapter_id": "ch_001",
-            "chapter_hint": "测试提示",
-        })
+        result = await _handle_write_chapter(
+            {
+                "path": str(tmp_path),
+                "chapter_id": "ch_001",
+                "chapter_hint": "测试提示",
+            }
+        )
 
         data = json.loads(result)
         assert data["chapter_id"] == "ch_001"
@@ -171,12 +179,12 @@ class TestAutoCreate:
         assert "错误" in result or "不存在" in result
 
     @pytest.mark.anyio
-    @patch("loom.mcp_server.AutoRunner")
+    @patch("opennovel.mcp_server.AutoRunner")
     async def test_auto_create_success(self, mock_runner_cls, tmp_path):
         """成功执行创作循环。"""
-        from loom.core.auto_runner import ChapterResult, RunReport
-        from loom.schemas.evaluation import ChapterEvaluation, DimensionScore
-        from loom.schemas.outline import ChapterOutline, SceneBreakdown
+        from opennovel.core.auto_runner import ChapterResult, RunReport
+        from opennovel.schemas.evaluation import ChapterEvaluation, DimensionScore
+        from opennovel.schemas.outline import ChapterOutline, SceneBreakdown
 
         # 初始化项目和大纲
         await _handle_init_project({"path": str(tmp_path)})
@@ -185,12 +193,22 @@ class TestAutoCreate:
 
         # Mock AutoRunner
         mock_outline = ChapterOutline(
-            chapter_id="ch_001", title="测试", summary="概要",
-            scenes=[SceneBreakdown(
-                scene_id="s1", description="场景", characters_involved=["char_001"],
-                emotional_tone="平静", estimated_words=1000,
-            )],
-            character_arcs={}, key_plot_points=[], narrative_rhythm="平稳", target_words=1000,
+            chapter_id="ch_001",
+            title="测试",
+            summary="概要",
+            scenes=[
+                SceneBreakdown(
+                    scene_id="s1",
+                    description="场景",
+                    characters_involved=["char_001"],
+                    emotional_tone="平静",
+                    estimated_words=1000,
+                )
+            ],
+            character_arcs={},
+            key_plot_points=[],
+            narrative_rhythm="平稳",
+            target_words=1000,
         )
         mock_eval = ChapterEvaluation(
             total_score=85,
@@ -201,14 +219,25 @@ class TestAutoCreate:
                 DimensionScore(dimension="节奏把控", score=16, comment=""),
                 DimensionScore(dimension="情感表达", score=17, comment=""),
             ],
-            summary="合格", issues=[], suggestions=[],
+            summary="合格",
+            issues=[],
+            suggestions=[],
         )
         mock_report = RunReport(
-            chapters=[ChapterResult(
-                chapter_id="ch_001", outline=mock_outline, chapter_text="正文",
-                evaluation=mock_eval, retry_count=0, manager_summary="摘要", word_count=100,
-            )],
-            total_chapters=1, successful_chapters=1, failed_chapters=0,
+            chapters=[
+                ChapterResult(
+                    chapter_id="ch_001",
+                    outline=mock_outline,
+                    chapter_text="正文",
+                    evaluation=mock_eval,
+                    retry_count=0,
+                    manager_summary="摘要",
+                    word_count=100,
+                )
+            ],
+            total_chapters=1,
+            successful_chapters=1,
+            failed_chapters=0,
         )
         mock_runner = MagicMock()
         mock_runner.run.return_value = mock_report

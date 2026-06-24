@@ -3,12 +3,12 @@
 import pytest
 from pydantic import ValidationError
 
-from loom.schemas.character import (
+from opennovel.schemas.character import (
     CharacterFrontmatter,
     EmotionVector,
     PhysicalState,
 )
-from loom.schemas.event import EventCreate, EventLog, EventLogBase, EventType, SnapshotMeta
+from opennovel.schemas.event import EventCreate, EventLog, EventLogBase, EventType, SnapshotMeta
 
 
 class TestEventLog:

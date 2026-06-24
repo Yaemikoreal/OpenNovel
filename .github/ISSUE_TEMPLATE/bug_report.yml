@@ -14,7 +14,7 @@ body:
     attributes:
       label: 问题描述
       description: 简洁清晰地描述这个 Bug 是什么
-      placeholder: 当我执行 `loom write` 时...
+      placeholder: 当我执行 `novel write` 时...
     validations:
       required: true
 
@@ -24,9 +24,9 @@ body:
       label: 复现步骤
       description: 如何复现这个问题？
       placeholder: |
-        1. 运行 `loom init test-novel`
+        1. 运行 `novel init test-novel`
         2. 创建角色文件 `characters/char_001.md`
-        3. 执行 `loom write draft/ch_001.md`
+        3. 执行 `novel write draft/ch_001.md`
         4. 看到错误
       value: |
         1.
@@ -54,7 +54,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: L.O.O.M. 版本
+      label: OpenNovel 版本
       description: 运行 `loom --version` 或查看 `pyproject.toml`
       placeholder: "1.0.1"
     validations:

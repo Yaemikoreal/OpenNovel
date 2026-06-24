@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/L.O.O.M.-Living%20Organic%20Outline%20Machine-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
-    <img alt="L.O.O.M." src="https://img.shields.io/badge/L.O.O.M.-Living%20Organic%20Outline%20Machine-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
+    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/OpenNovel-Living%20Organic%20Outline%20Machine-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
+    <img alt="OpenNovel" src="https://img.shields.io/badge/OpenNovel-Living%20Organic%20Outline%20Machine-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
   </picture>
 </p>
 
@@ -11,20 +11,20 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Yaemikoreal/LOOM/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/Yaemikoreal/LOOM?color=8B5CF6&style=flat-square" alt="MIT License">
+  <a href="https://github.com/Yaemikoreal/OpenNovel/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/Yaemikoreal/OpenNovel?color=8B5CF6&style=flat-square" alt="MIT License">
   </a>
   <a href="https://www.python.org/downloads/">
     <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=ffd343" alt="Python 3.10+">
   </a>
-  <a href="https://github.com/Yaemikoreal/LOOM/actions/workflows/ci.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/Yaemikoreal/LOOM/ci.yml?branch=main&style=flat-square&label=CI" alt="CI">
+  <a href="https://github.com/Yaemikoreal/OpenNovel/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/Yaemikoreal/OpenNovel/ci.yml?branch=main&style=flat-square&label=CI" alt="CI">
   </a>
   <a href="https://github.com/astral-sh/ruff">
     <img src="https://img.shields.io/badge/code%20style-ruff-261230?style=flat-square" alt="Ruff">
   </a>
-  <a href="https://github.com/Yaemikoreal/LOOM/releases">
-    <img src="https://img.shields.io/github/v/release/Yaemikoreal/LOOM?style=flat-square&color=8B5CF6" alt="Latest Release">
+  <a href="https://github.com/Yaemikoreal/OpenNovel/releases">
+    <img src="https://img.shields.io/github/v/release/Yaemikoreal/OpenNovel?style=flat-square&color=8B5CF6" alt="Latest Release">
   </a>
 </p>
 
@@ -32,11 +32,11 @@
 
 ## 简介
 
-**L.O.O.M.** 是面向长篇小说创作的叙事操作系统。它不是"一键生成小说"的玩具，而是写作者的数字织机与记忆外脑。
+**OpenNovel** 是面向长篇小说创作的叙事操作系统。它不是"一键生成小说"的玩具，而是写作者的数字织机与记忆外脑。
 
-> 你写故事，L.O.O.M. 记住故事的每一个细节。
+> 你写故事，OpenNovel 记住故事的每一个细节。
 
-传统写作工具要么过于简单（纯文本编辑器），要么过于复杂（项目管理式写作软件）。L.O.O.M. 走了第三条路：
+传统写作工具要么过于简单（纯文本编辑器），要么过于复杂（项目管理式写作软件）。OpenNovel 走了第三条路：
 
 - **Human Layer** — 作者只写纯 Markdown，兼容 Obsidian、VSCode 等任意编辑器
 - **Machine Shadow** — AI 在后台自动提取角色状态、追踪事件因果、维护设定一致性
@@ -52,7 +52,7 @@
 
 **锚定反馈** — Critic 的评审意见锚定到具体原文段落，Writer 的修订指令精确到"找到引用位置，针对性修改"，而非模糊的"改一下这里"。
 
-**零信任安全** — AI 只能提议，人类拥有最终否决权。`loom commit` 强制 Diff 审阅，`loom rollback` 一键回滚到任意历史快照。
+**零信任安全** — AI 只能提议，人类拥有最终否决权。`novel commit` 强制 Diff 审阅，`novel rollback` 一键回滚到任意历史快照。
 
 **模型无关** — 通过 LiteLLM 总线连接任意 LLM（OpenAI / Anthropic / DeepSeek / Ollama / 本地模型）。Writer、Critic、Manager、Director 可独立配置不同模型。
 
@@ -67,8 +67,8 @@
 ### 安装
 
 ```bash
-git clone https://github.com/Yaemikoreal/LOOM.git
-cd LOOM
+git clone https://github.com/Yaemikoreal/OpenNovel.git
+cd OpenNovel
 pip install -e ".[dev]"
 ```
 
@@ -76,34 +76,34 @@ pip install -e ".[dev]"
 
 ```bash
 # 初始化项目
-loom init ./my-novel
+novel init ./my-novel
 
 # 编辑角色文件 (characters/char_001.md)
 # 编辑世界观设定 (canon/world_rules.md)
 # 编辑大纲 (outlines/outline.md)
 
 # 开始写作（AI 续写循环）
-loom write ./my-novel/draft/ch_001.md
+novel write ./my-novel/draft/ch_001.md
 
 # 存入灵感碎片
-loom stash "深渊不会主动吞噬你——它只是让你自己跳下去。" --tag 金句
+novel stash "深渊不会主动吞噬你——它只是让你自己跳下去。" --tag 金句
 
 # 审阅状态变更（5 步流程：快照 → 提取 → Diff → 确认 → 固化）
-loom commit ./my-novel/draft/ch_001.md
+novel commit ./my-novel/draft/ch_001.md
 ```
 
 ### 全自动创作（推荐）
 
-全自动创作是 L.O.O.M. 的核心能力。准备好大纲、角色、世界观后，一条命令即可生成完整小说。
+全自动创作是 OpenNovel 的核心能力。准备好大纲、角色、世界观后，一条命令即可生成完整小说。
 
 **第一步：初始化项目**
 
 ```bash
-loom init ./my-novel
+novel init ./my-novel
 cd my-novel
 ```
 
-**第二步：配置 `loom.yaml`**
+**第二步：配置 `novel.yaml`**
 
 ```yaml
 model: openai/gpt-4o
@@ -166,7 +166,7 @@ inventory:
 **第五步：运行自主创作**
 
 ```bash
-loom auto . --chapters 7
+novel auto . --chapters 7
 ```
 
 系统将自动执行四 Agent 流水线：
@@ -195,22 +195,22 @@ loom auto . --chapters 7
 
 | 命令 | 功能 |
 |:---|:---|
-| `loom init <path>` | 初始化小说项目目录 |
-| `loom write <file>` | 沉浸式 AI 续写循环 |
-| `loom auto <path>` | 四 Agent 全自动创作 |
-| `loom stash <text>` | 存入灵感潜意识池 |
-| `loom commit <file>` | 5 步审阅流程固化状态 |
-| `loom rollback <snapshot>` | 回滚到指定快照 |
-| `loom diff <file>` | 正文与 Shadow 一致性校验 |
-| `loom doctor <path>` | 世界线健康度诊断 |
+| `novel init <path>` | 初始化小说项目目录 |
+| `novel write <file>` | 沉浸式 AI 续写循环 |
+| `novel auto <path>` | 四 Agent 全自动创作 |
+| `novel stash <text>` | 存入灵感潜意识池 |
+| `novel commit <file>` | 5 步审阅流程固化状态 |
+| `novel rollback <snapshot>` | 回滚到指定快照 |
+| `novel diff <file>` | 正文与 Shadow 一致性校验 |
+| `novel doctor <path>` | 世界线健康度诊断 |
 
-详细文档：`loom --help` 或查看 [CLAUDE.md](CLAUDE.md)。
+详细文档：`novel --help` 或查看 [CLAUDE.md](CLAUDE.md)。
 
 ---
 
 ## MCP Server 集成
 
-L.O.O.M. 提供 MCP (Model Context Protocol) Server，让 Claude Code 等 AI Agent 通过标准协议调用创作能力。
+OpenNovel 提供 MCP (Model Context Protocol) Server，让 Claude Code 等 AI Agent 通过标准协议调用创作能力。
 
 ### 工具列表
 
@@ -228,8 +228,8 @@ L.O.O.M. 提供 MCP (Model Context Protocol) Server，让 Claude Code 等 AI Age
 ```json
 {
   "mcpServers": {
-    "loom": {
-      "command": "loom-mcp",
+    "novel": {
+      "command": "novel-mcp",
       "args": [],
       "env": {}
     }
@@ -243,13 +243,13 @@ L.O.O.M. 提供 MCP (Model Context Protocol) Server，让 Claude Code 等 AI Age
 
 ```
 # 初始化一个新小说项目
-请用 loom 初始化一个项目到 ./my-novel
+请用 novel 初始化一个项目到 ./my-novel
 
 # 查看项目状态
 请查看 ./my-novel 的当前状态
 
 # 全自动创作
-请用 loom 为 ./my-novel 自主创作 7 章
+请用 novel 为 ./my-novel 自主创作 7 章
 ```
 
 ---
@@ -279,7 +279,7 @@ L.O.O.M. 提供 MCP (Model Context Protocol) Server，让 Claude Code 等 AI Age
 - **ID 即锚点** — 全局 Canonical IDs（`char_001`、`loc_london`），严禁用角色名做关联
 - **权威分级** — `[CANON] > [STATE MEMORY] > [SUBCONSCIOUS]`，灵感不可作为设定执行
 - **人工审核关口** — AI 只能提议，人类拥有最终否决权
-- **操作可逆** — 破坏性写入前必须生成 Snapshot，支持 `loom rollback` 秒级恢复
+- **操作可逆** — 破坏性写入前必须生成 Snapshot，支持 `novel rollback` 秒级恢复
 
 ### 技术栈
 
@@ -299,8 +299,8 @@ L.O.O.M. 提供 MCP (Model Context Protocol) Server，让 Claude Code 等 AI Age
 ## 开发
 
 ```bash
-git clone https://github.com/Yaemikoreal/LOOM.git
-cd LOOM
+git clone https://github.com/Yaemikoreal/OpenNovel.git
+cd OpenNovel
 
 python -m venv .venv
 .venv\Scripts\activate        # Windows
@@ -310,24 +310,24 @@ pip install -e ".[dev]"
 
 # 测试
 pytest -v --tb=short
-pytest --cov=loom --cov-report=term-missing
+pytest --cov=opennovel --cov-report=term-missing
 
 # 代码质量
-ruff check loom/ tests/
-ruff format --check loom/ tests/
-mypy loom/
+ruff check opennovel/ tests/
+ruff format --check opennovel/ tests/
+mypy opennovel/
 ```
 
 ### 项目结构
 
 ```
-loom/
+opennovel/
 ├── cli/                     # Typer CLI 命令入口
-│   ├── main.py              # loom 根命令
-│   ├── write.py             # loom write
-│   ├── auto.py              # loom auto (四 Agent 全自动)
-│   ├── commit.py            # loom commit & rollback
-│   └── stash.py             # loom stash
+│   ├── main.py              # novel 根命令
+│   ├── write.py             # novel write
+│   ├── auto.py              # novel auto (四 Agent 全自动)
+│   ├── commit.py            # novel commit & rollback
+│   └── stash.py             # novel stash
 ├── core/                    # 核心引擎
 │   ├── llm.py               # LiteLLM 封装
 │   ├── auto_runner.py       # 四 Agent 编排器
@@ -373,7 +373,7 @@ loom/
 欢迎各种形式的贡献。
 
 1. 阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解开发流程
-2. 查看 [Issues](https://github.com/Yaemikoreal/LOOM/issues) 寻找想解决的问题
+2. 查看 [Issues](https://github.com/Yaemikoreal/OpenNovel/issues) 寻找想解决的问题
 3. 阅读 [CLAUDE.md](CLAUDE.md) 了解架构约定
 4. Fork 并提交 Pull Request
 
