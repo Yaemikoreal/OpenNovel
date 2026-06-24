@@ -76,10 +76,11 @@
 </td>
 <td width="50%">
 
-### 🤖 三 Agent 自主创作
-- Writer 思考规划 + 沉浸式创作
-- Critic 五维 100 分制评分（≥80 分通过）
+### 🤖 四 Agent 自主创作
+- Writer 思考规划 + 沉浸式创作 + 多方案变异
+- Critic 五维 100 分制评分 + 大纲三维预审 + 锚定反馈
 - Manager 自动提取角色状态变更
+- Director 全局叙事分析 + 策略指导注入
 - 单章最多 5 次重试，确保质量
 </td>
 </tr>
@@ -128,7 +129,9 @@
 ### 🎯 全自动模式
 - `loom auto` 一键自主创作整部小说
 - 输入大纲 + 角色 + 世界观 → 输出完整章节
-- 自动记录创作日志和角色状态变更
+- 盲目变异：关键章节自动生成 3 个大纲方案，Critic 预审选择最佳
+- Director 全局分析：每章结束后自动评估节奏/张力/角色弧线，注入策略指导
+- 每章写入前自动快照，写入后一致性校验，支持一键回滚
 </td>
 </tr>
 </table>
@@ -181,10 +184,12 @@ loom commit ./my-epic/draft/ch_001.md
 ```bash
 # 准备大纲文件 (outlines/outline.md) 和 loom.yaml 配置
 # 然后一键生成整部小说
-loom auto ./my-epic --chapters 5
+loom auto ./my-epic --chapters 7
 
-# Writer → Critic → Manager 循环，全程无人工干预
+# 四 Agent 流水线：Writer → Critic → Manager → Director
 # 每章经过五维评分，≥80 分通过，最多 5 次重试
+# Director 每章结束后分析全局叙事状态，自动注入策略指导
+# 关键章节触发盲目变异：3 个大纲方案 → Critic 预审 → 选择最佳
 ```
 
 ---
@@ -203,6 +208,22 @@ loom auto ./my-epic --chapters 5
 | `loom doctor <path>` | 世界线健康度诊断 | ✅ |
 
 详细命令文档：`loom --help` 或查看 [CLAUDE.md](CLAUDE.md)。
+
+### 演示项目
+
+`test_novel/` 包含一个由 LOOM 自主创作系统完整生成的 7 章末世生存小说《最后的信号》：
+
+| 章节 | 标题 | 字数 | 评分 |
+|:---|:---|---:|---:|
+| ch_001 | 灰烬中的敲门声 | 4708 | 83 |
+| ch_002 | 潮汐来袭 | 3951 | 83 |
+| ch_003 | 残缺的白衣 | 4508 | 81 |
+| ch_004 | 灰潮带 | 4705 | 85 |
+| ch_005 | 碎光与余温 | 4638 | 88 |
+| ch_006 | 信号 | 4522 | 85 |
+| ch_007 | 灯塔 | 4901 | 86 |
+
+全部 7 章由 Writer→Critic→Manager→Director 四 Agent 流水线自动生成，平均分 84.4，总字数 31,933。
 
 ---
 
@@ -298,9 +319,10 @@ loom/
 ├── agents/                  # 代理人格
 │   ├── actor.py             # Actor 沉浸式续写
 │   ├── auditor.py           # Auditor 状态提取
-│   ├── writer.py            # Writer Agent (思考+创作+修改)
-│   ├── critic.py            # Critic Agent (五维评分)
-│   └── manager.py           # Manager Agent (状态提取)
+│   ├── writer.py            # Writer Agent (思考+创作+修改+变异)
+│   ├── critic.py            # Critic Agent (五维评分+大纲评审+锚定反馈)
+│   ├── manager.py           # Manager Agent (状态提取)
+│   └── director.py          # Director Agent (全局叙事分析+策略指导)
 ├── storage/                 # 存储适配
 │   ├── sqlite.py            # SQLite 事件账本
 │   ├── yaml_storage.py      # YAML Frontmatter 安全读写
@@ -309,14 +331,18 @@ loom/
 │   ├── character.py         # 角色档案模型
 │   ├── event.py             # 事件账本模型
 │   ├── outline.py           # Writer 结构化大纲
-│   ├── evaluation.py        # Critic 评分模型
+│   ├── evaluation.py        # Critic 评分模型 (含 AnchoredIssue)
+│   ├── outline_evaluation.py # 大纲三维评审模型
+│   ├── director.py          # Director 分析输出模型
 │   └── manager_update.py    # Manager 状态更新模型
 ├── prompts/                 # Prompt 即资产
 │   ├── actor.v1.md          # Actor 人格 Prompt
 │   ├── auditor.v1.md        # Auditor 人格 Prompt
 │   ├── writer.v1.md         # Writer Agent Prompt
 │   ├── critic.v1.md         # Critic Agent Prompt
-│   └── manager.v1.md        # Manager Agent Prompt
+│   ├── critic_outline.v1.md # Critic 大纲评审 Prompt
+│   ├── manager.v1.md        # Manager Agent Prompt
+│   └── director.v1.md       # Director Agent Prompt
 └── mcp_server.py            # MCP Server (Claude Code 集成)
 ```
 

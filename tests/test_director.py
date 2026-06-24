@@ -1,0 +1,196 @@
+"""P4 Director Agent 测试。
+
+覆盖 analyze()、配置开关、AutoRunner 集成。
+"""
+
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
+from loom.agents.director import Director
+from loom.core.auto_runner import AutoRunner, ChapterResult
+from loom.core.config import LoomConfig
+from loom.schemas.director import DirectorAnalysis
+from loom.schemas.evaluation import ChapterEvaluation, DimensionScore
+from loom.schemas.outline import ChapterOutline, SceneBreakdown
+
+
+# ── 辅助工具 ──
+
+
+def _make_outline() -> ChapterOutline:
+    return ChapterOutline(
+        chapter_id="ch_001",
+        title="测试章节",
+        summary="测试概要",
+        scenes=[
+            SceneBreakdown(
+                scene_id="scene_1",
+                description="场景描述",
+                characters_involved=["char_001"],
+                emotional_tone="紧张",
+                estimated_words=1000,
+            )
+        ],
+        character_arcs={"char_001": "从恐惧到勇敢"},
+        key_plot_points=["发现密室"],
+        narrative_rhythm="先慢后快",
+        target_words=3000,
+    )
+
+
+def _make_evaluation(score: int = 85) -> ChapterEvaluation:
+    return ChapterEvaluation(
+        total_score=score,
+        dimensions=[
+            DimensionScore(dimension="文笔质量", score=18, comment="ok"),
+            DimensionScore(dimension="情节逻辑", score=17, comment="ok"),
+            DimensionScore(dimension="角色一致性", score=17, comment="ok"),
+            DimensionScore(dimension="节奏把控", score=16, comment="ok"),
+            DimensionScore(dimension="情感表达", score=17, comment="ok"),
+        ],
+        summary="总体评价",
+        issues=[],
+        suggestions=[],
+    )
+
+
+def _make_chapter_result(score: int = 85) -> ChapterResult:
+    return ChapterResult(
+        chapter_id="ch_001",
+        outline=_make_outline(),
+        chapter_text="正文",
+        evaluation=_make_evaluation(score),
+        retry_count=0,
+        manager_summary="主角在加油站遇到其他三人",
+        word_count=3000,
+    )
+
+
+def _make_director_analysis_json() -> str:
+    return """{
+        "pacing_assessment": "适中",
+        "tension_curve": "上升中",
+        "character_arc_status": {"char_001": "成长中"},
+        "strategic_guidance": "下一章应放缓节奏，安排内心独白。",
+        "creative_direction_adjustment": "",
+        "warnings": []
+    }"""
+
+
+class MockLLMBus:
+    def __init__(self, responses: list[str]) -> None:
+        self._responses = responses
+        self._call_count = 0
+
+    def chat(self, messages: list, **kwargs) -> MagicMock:
+        resp = MagicMock()
+        content = self._responses[self._call_count % len(self._responses)]
+        resp.choices = [MagicMock()]
+        resp.choices[0].message.content = content
+        self._call_count += 1
+        return resp
+
+
+# ── DirectorAnalysis Schema 测试 ──
+
+
+class TestDirectorAnalysis:
+    """DirectorAnalysis 模型测试。"""
+
+    def test_valid_analysis(self) -> None:
+        analysis = DirectorAnalysis(
+            pacing_assessment="适中",
+            tension_curve="上升中",
+            character_arc_status={"char_001": "成长中"},
+            strategic_guidance="放缓节奏",
+        )
+        assert analysis.pacing_assessment == "适中"
+        assert analysis.warnings == []
+
+    def test_optional_fields(self) -> None:
+        analysis = DirectorAnalysis(
+            pacing_assessment="适中",
+            tension_curve="上升中",
+            character_arc_status={},
+            strategic_guidance="",
+        )
+        assert analysis.creative_direction_adjustment == ""
+        assert analysis.warnings == []
+
+
+# ── Director Agent 测试 ──
+
+
+class TestDirectorAnalyze:
+    """Director.analyze() 测试。"""
+
+    def test_returns_valid_analysis(self, tmp_path: Path) -> None:
+        """返回合法的 DirectorAnalysis。"""
+        bus = MockLLMBus([_make_director_analysis_json()])
+        director = Director(llm_bus=bus, project_root=tmp_path)
+        results = [_make_chapter_result(85)]
+
+        analysis = director.analyze(results, "下一章大纲")
+
+        assert isinstance(analysis, DirectorAnalysis)
+        assert analysis.pacing_assessment == "适中"
+        assert "char_001" in analysis.character_arc_status
+
+    def test_empty_results_returns_default(self, tmp_path: Path) -> None:
+        """空结果返回默认分析。"""
+        bus = MockLLMBus([_make_director_analysis_json()])
+        director = Director(llm_bus=bus, project_root=tmp_path)
+
+        analysis = director.analyze([], "下一章大纲")
+
+        assert analysis.pacing_assessment == "无数据"
+        assert analysis.strategic_guidance == ""
+
+    def test_analysis_builds_correct_data(self, tmp_path: Path) -> None:
+        """分析数据正确构建。"""
+        bus = MockLLMBus([_make_director_analysis_json()])
+        director = Director(llm_bus=bus, project_root=tmp_path)
+        results = [
+            _make_chapter_result(82),
+            _make_chapter_result(85),
+            _make_chapter_result(88),
+        ]
+
+        # 直接测试数据构建方法
+        data = director._build_analysis_data(results)
+        assert "82" in data
+        assert "85" in data
+        assert "88" in data
+        assert "ch_001" in data
+
+
+# ── Config 集成测试 ──
+
+
+class TestDirectorConfig:
+    """Director 配置测试。"""
+
+    def test_director_enabled_default(self) -> None:
+        """默认启用 Director。"""
+        config = LoomConfig()
+        assert config.director_enabled is True
+
+    def test_director_disabled(self, tmp_path: Path) -> None:
+        """禁用 Director 时不创建实例。"""
+        config = LoomConfig(director_enabled=False)
+        # 需要 mock LLMBus 因为 AutoRunner 会尝试创建
+        from unittest.mock import patch
+
+        with patch("loom.core.auto_runner.LLMBus"):
+            runner = AutoRunner(project_root=tmp_path, config=config)
+        assert runner.director is None
+
+    def test_director_agent_config(self) -> None:
+        """Director 的 AgentConfig 正确解析。"""
+        config = LoomConfig()
+        director_cfg = config.get_agent_llm_config("director")
+        assert "model" in director_cfg
+        assert "api_base" in director_cfg
+        assert "api_key" in director_cfg

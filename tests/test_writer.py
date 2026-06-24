@@ -215,6 +215,7 @@ class TestWriterThink:
         llm_bus = MockLLMBus([valid_outline_json])
         ret = MagicMock()
         ret.query_canon.return_value = "魔法世界观设定"
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -236,6 +237,8 @@ class TestWriterThink:
         llm_bus = MockLLMBus([valid_outline_json])
         ret = MagicMock()
         ret.query_canon.return_value = "设定内容"
+        ret.query_subconscious.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -244,7 +247,8 @@ class TestWriterThink:
         )
         writer.think("ch_001", "大纲提示")
 
-        ret.query_canon.assert_called_once_with("大纲提示", top_k=3)
+        ret.query_canon.assert_called_once()
+        # 现在 query_canon 接收截断后的 task_message，而非原始大纲提示
 
     def test_think_passes_messages_to_llm(
         self, empty_project_root: Path, valid_outline_json: str
@@ -253,6 +257,7 @@ class TestWriterThink:
         llm_bus = MockLLMBus([valid_outline_json])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -293,6 +298,7 @@ class TestWriterThink:
         llm_bus = MockLLMBus([outline_json])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -318,6 +324,7 @@ class TestWriterThinkRetry:
         llm_bus = MockLLMBus([invalid_json_response, valid_outline_json])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -340,6 +347,7 @@ class TestWriterThinkRetry:
         ])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -357,6 +365,7 @@ class TestWriterThinkRetry:
         llm_bus = MockLLMBus(["", valid_outline_json])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -382,6 +391,7 @@ class TestWriterWrite:
         llm_bus = MockLLMBus([sample_chapter_text])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -400,6 +410,7 @@ class TestWriterWrite:
         llm_bus = MockLLMBus(["生成的正文内容"])
         ret = MagicMock()
         ret.query_canon.return_value = "设定"
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -420,6 +431,7 @@ class TestWriterWrite:
         llm_bus = MockLLMBus(["新章节内容"])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -437,6 +449,7 @@ class TestWriterWrite:
         llm_bus = MockLLMBus([""])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -461,6 +474,7 @@ class TestWriterRevise:
         llm_bus = MockLLMBus([revised_text])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -483,6 +497,7 @@ class TestWriterRevise:
         llm_bus = MockLLMBus(["修订后的内容"])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]
@@ -507,6 +522,7 @@ class TestWriterRevise:
         llm_bus = MockLLMBus([""])
         ret = MagicMock()
         ret.query_canon.return_value = ""
+        ret.query_subconscious.return_value = ""
 
         writer = Writer(
             llm_bus=llm_bus,  # type: ignore[arg-type]

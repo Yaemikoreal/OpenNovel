@@ -82,9 +82,32 @@
   ],
   "summary": "总体评价...",
   "issues": ["问题1", "问题2"],
-  "suggestions": ["建议1", "建议2"]
+  "suggestions": ["建议1", "建议2"],
+  "anchored_issues": [
+    {
+      "dimension": "情节逻辑",
+      "severity": "major",
+      "quote": "原文中存在问题的 20-50 字引用",
+      "problem": "问题描述",
+      "suggestion": "修改建议",
+      "location_hint": "第 3 段"
+    }
+  ]
 }
 ```
+
+### anchored_issues 规则
+
+当评分低于 90 分时，你应该尽量提供 `anchored_issues`，帮助 Writer 精确定位问题：
+
+- **dimension**: 必须是五个评分维度之一
+- **severity**: `critical`（硬伤，必须修改）/ `major`（明显问题）/ `minor`（建议优化）
+- **quote**: 从正文中精确引用 20-50 字的原文，作为 Writer 定位的锚点
+- **problem**: 具体描述问题所在
+- **suggestion**: 给出可操作的修改建议
+- **location_hint**: 可选，描述位置如 "第 3 段"、"场景 2 开头"
+
+评分 90 分以上时，`anchored_issues` 可以为空列表。
 
 ## 禁止行为
 

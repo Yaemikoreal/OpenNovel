@@ -80,6 +80,10 @@ class LoomConfig:
     agent_writer: AgentConfig = field(default_factory=AgentConfig)
     agent_critic: AgentConfig = field(default_factory=AgentConfig)
     agent_manager: AgentConfig = field(default_factory=AgentConfig)
+    agent_director: AgentConfig = field(default_factory=AgentConfig)
+
+    # Director 配置
+    director_enabled: bool = True
 
     extra: dict = field(default_factory=dict)
 
@@ -101,6 +105,7 @@ class LoomConfig:
             "writer": self.agent_writer,
             "critic": self.agent_critic,
             "manager": self.agent_manager,
+            "director": self.agent_director,
         }
         agent_cfg = agent_cfg_map.get(agent_name, AgentConfig())
         return {
@@ -138,12 +143,14 @@ class LoomConfig:
         agent_writer = _parse_agent_config(agents_data.get("writer", {}))
         agent_critic = _parse_agent_config(agents_data.get("critic", {}))
         agent_manager = _parse_agent_config(agents_data.get("manager", {}))
+        agent_director = _parse_agent_config(agents_data.get("director", {}))
 
         # 提取已知字段，其余放入 extra
         known_keys = {
             "version", "model", "token_budget", "output_reserve",
             "api_base", "api_key", "agents",
             "creative_direction", "target_chapters", "words_per_chapter", "outline",
+            "director_enabled",
         }
         extra = {k: v for k, v in data.items() if k not in known_keys}
 
@@ -161,6 +168,8 @@ class LoomConfig:
             agent_writer=agent_writer,
             agent_critic=agent_critic,
             agent_manager=agent_manager,
+            agent_director=agent_director,
+            director_enabled=bool(data.get("director_enabled", True)),
             extra=extra,
         )
 
@@ -189,9 +198,17 @@ class LoomConfig:
         data["words_per_chapter"] = self.words_per_chapter
         data["outline"] = self.outline
 
+        # Director 配置
+        data["director_enabled"] = self.director_enabled
+
         # per-agent 配置
         agents: dict = {}
-        for name, cfg in [("writer", self.agent_writer), ("critic", self.agent_critic), ("manager", self.agent_manager)]:
+        for name, cfg in [
+            ("writer", self.agent_writer),
+            ("critic", self.agent_critic),
+            ("manager", self.agent_manager),
+            ("director", self.agent_director),
+        ]:
             agent_data: dict = {}
             if cfg.model:
                 agent_data["model"] = cfg.model

@@ -88,12 +88,14 @@ messages = assemble_actor_context(
 loom/
 ├── cli/                     # Typer CLI 命令入口
 │   ├── main.py              # 根命令 (init/rollback/diff/doctor)
-│   ├── write.py             # loom write
+│   ├── write.py             # loom write (Gen1 交互式)
+│   ├── auto.py              # loom auto (Gen2 自主创作)
 │   ├── commit.py            # loom commit (5 步审阅流程)
 │   └── stash.py             # loom stash
 ├── core/                    # 核心引擎
 │   ├── llm.py               # LLMBus: LiteLLM + tenacity 重试
-│   ├── context_assembler.py # TokenCounter + 权威分级上下文组装 + 熔断
+│   ├── context_assembler.py # TokenCounter + 权威分级上下文组装 + 熔断（所有 Agent 通用）（所有 Agent 通用）
+│   ├── auto_runner.py       # AutoRunner: Gen2 三 Agent 自主编排器
 │   ├── retriever.py         # Retriever: 双索引语义检索路由 (canon + subconscious)
 │   ├── state_manager.py     # StateManager: 快照/回滚/Diff
 │   ├── parser.py            # Markdown 场景切分 + Token 计数
@@ -101,18 +103,32 @@ loom/
 │   ├── diff_checker.py      # 正文与 Shadow 一致性校验
 │   └── doctor.py            # 世界线健康度诊断
 ├── agents/                  # 代理人格
-│   ├── actor.py             # Actor: 沉浸式续写
-│   └── auditor.py           # Auditor: 状态提取 + Pydantic 校验 + 重试纠偏
+│   ├── actor.py             # Actor: Gen1 沉浸式续写
+│   ├── auditor.py           # Auditor: Gen1 状态提取 + Pydantic 校验 + 重试纠偏
+│   ├── writer.py            # Writer: Gen2 创作代理 (think → write/revise, think_variations)
+│   ├── critic.py            # Critic: Gen2 五维评分 + 锚定反馈 + 大纲评审
+│   ├── manager.py           # Manager: Gen2 状态提取 + 角色更新
+│   └── director.py          # Director: 全局叙事分析 + 策略指导注入
 ├── storage/                 # 存储适配
 │   ├── sqlite.py            # EventStore: SQLModel 事件账本
 │   ├── yaml_storage.py      # YAMLStorage: Frontmatter 安全读写 + 原子写入
 │   └── vector.py            # VectorStore: LlamaIndex 向量索引（可选 BGE-M3 本地 embedding）
 ├── schemas/                 # Pydantic / SQLModel 模型
 │   ├── character.py         # CharacterFrontmatter, PhysicalState, EmotionVector
-│   └── event.py             # EventLog, EventCreate, EventDiff, SnapshotMeta
+│   ├── event.py             # EventLog, EventCreate, EventDiff, SnapshotMeta
+│   ├── evaluation.py        # ChapterEvaluation, DimensionScore, AnchoredIssue
+│   ├── outline.py           # ChapterOutline, SceneBreakdown
+│   ├── outline_evaluation.py # OutlineEvaluation (大纲三维评审)
+│   ├── director.py          # DirectorAnalysis (导演策略分析)
+│   └── manager_update.py    # ManagerUpdateResult, CharacterUpdate, EventRecord
 └── prompts/                 # Prompt 即资产 (核心产品逻辑)
     ├── actor.v1.md          # Actor 人格 Prompt (冲突降级规则)
-    └── auditor.v1.md        # Auditor 人格 Prompt (提取规则)
+    ├── auditor.v1.md        # Auditor 人格 Prompt (提取规则)
+    ├── writer.v1.md         # Writer 人格 Prompt (创作 + 修订 + 变异)
+    ├── critic.v1.md         # Critic 人格 Prompt (五维评分 + 锚定反馈)
+    ├── critic_outline.v1.md # Critic 大纲评审 Prompt (三维评分)
+    ├── manager.v1.md        # Manager 人格 Prompt (状态提取)
+    └── director.v1.md       # Director 人格 Prompt (全局叙事分析)
 ```
 
 ### 项目初始化后的目录结构
@@ -151,8 +167,8 @@ loom/
 
 ### Token 熔断机制
 
-`context_assembler.py` 中的 `assemble_actor_context()` 按权威分级注入上下文：
-- 人格注入 → CANON(20%) → STATE MEMORY(30%) → SUBCONSCIOUS(10%) → 近期正文(40%)
+`context_assembler.py` 中的 `assemble_context()` 为所有 Agent（Actor/Writer/Critic）按权威分级注入上下文：
+- 人格注入 → CANON(20%) → STATE MEMORY(30%) → SUBCONSCIOUS(10%) → 任务消息(40%)
 - 总预算 8000 Tokens（预留 2000 输出）
 - 超限按权威层级从低到高截断（SUBCONSCIOUS → STATE MEMORY → CANON）
 
@@ -172,6 +188,7 @@ loom/
 - `core/context_assembler.py` — PANORAMIC 模式已注入历史章节正文（`_load_previous_chapters()`）
 - BGE-M3 嵌入模型依赖 `sentence-transformers` (optional dependency `local-embedding`)
 - `networkx` 因果图与伏笔网（Phase 2 预留，未实现，已移至可选依赖 `phase2`）
+- **P4 导演 Agent 增强**（规划中）— 章节调度（合并/插入/删除）能力尚未实现，当前仅支持策略指导注入
 
 ## 依赖管理
 

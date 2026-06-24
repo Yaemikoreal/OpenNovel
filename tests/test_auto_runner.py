@@ -212,11 +212,11 @@ class TestAutoRunnerInit:
         empty_project_root: Path,
         default_config: LoomConfig,
     ) -> None:
-        """测试三个 Agent 的 LLMBus 配置正确传递。"""
+        """测试四个 Agent 的 LLMBus 配置正确传递。"""
         AutoRunner(project_root=empty_project_root, config=default_config)
 
-        # 验证 LLMBus 被创建 3 次（writer, critic, manager）
-        assert mock_llm_bus_cls.call_count == 3
+        # 验证 LLMBus 被创建 4 次（writer, critic, manager, director）
+        assert mock_llm_bus_cls.call_count == 4
 
         # 验证每次调用都传递了正确的配置
         for call in mock_llm_bus_cls.call_args_list:

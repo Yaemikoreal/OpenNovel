@@ -1,4 +1,4 @@
-"""上下文权威组装器与 Token 熔断 - Actor 代理的心脏。
+"""上下文权威组装器与 Token 熔断。
 
 负责将三层数据按权威分级打包送入 LLM，根据模型窗口大小自动选择策略：
 
@@ -6,7 +6,10 @@
 - STANDARD (32K-128K): 48K 预算，当前章全量 + 全部活跃角色状态
 - PANORAMIC (>128K): 128K 软限，全量设定 + 全量潜意识 + 历史章节倒序注入
 
-详见 docs/adr/0002-three-tier-context-strategy.md。
+通用入口 `assemble_context()` 为所有 Agent（Actor/Writer/Critic）提供统一的
+分级上下文管道，通过 `task_message` 参数区分不同 Agent 的任务指令。
+
+详见 docs/adr/0002-three-tier-context-strategy.md 和 docs/adr/0003-*.md。
 """
 
 import logging
@@ -224,35 +227,69 @@ def assemble_actor_context(
     Returns:
         组装完成的消息列表，可直接传入 LLM API
     """
-    if strategy == ContextStrategy.STANDARD:
-        return _assemble_standard(
-            chapter_path,
-            project_root,
-            current_text,
-            prompt_path,
-            canon_content,
-            subconscious_content,
-            yaml_storage,
-        )
-    elif strategy == ContextStrategy.PANORAMIC:
+    task_message = f"[Previous Text]\n{current_text}\n\nCONTINUE:"
+    return assemble_context(
+        project_root=project_root,
+        task_message=task_message,
+        prompt_path=prompt_path or Path("prompts/actor.v1.md"),
+        chapter_path=chapter_path,
+        canon_content=canon_content,
+        subconscious_content=subconscious_content,
+        yaml_storage=yaml_storage,
+        strategy=strategy,
+    )
+
+
+def assemble_context(
+    *,
+    project_root: Path,
+    task_message: str,
+    prompt_path: Path,
+    chapter_path: Path | None = None,
+    canon_content: str = "",
+    subconscious_content: str = "",
+    active_characters: list[str] | None = None,
+    yaml_storage: YAMLStorage | None = None,
+    strategy: ContextStrategy = ContextStrategy.STANDARD,
+) -> list[dict[str, str]]:
+    """通用上下文组装入口，为所有 Agent 提供统一的分级上下文管道。
+
+    复用 CANON / STATE_MEMORY / SUBCONSCIOUS 三层权威注入、Token 熔断、
+    策略路由（FRUGAL/STANDARD/PANORAMIC）。
+
+    与 assemble_actor_context 的区别：
+    - task_message 参数化，不再硬编码 CONTINUE:
+    - active_characters 可显式传入（不依赖 chapter_path 的 Frontmatter）
+    - prompt_path 必须显式指定
+
+    Args:
+        project_root: 项目根目录路径
+        task_message: 最终的 user 消息（Writer 的大纲+创作指令 / Critic 的评审指令等）
+        prompt_path: Agent 人格 Prompt 文件路径
+        chapter_path: 当前章节路径（可选，用于提取活跃角色和历史章节注入）
+        canon_content: 从检索引擎获取的设定内容
+        subconscious_content: 从潜意识池检索的灵感碎片
+        active_characters: 显式指定的角色 ID 列表（优先于从 chapter_path 提取）
+        yaml_storage: YAML 存储实例
+        strategy: 上下文组装策略
+
+    Returns:
+        组装完成的消息列表，可直接传入 LLM API
+    """
+    if strategy == ContextStrategy.PANORAMIC:
         return _assemble_panoramic(
-            chapter_path,
-            project_root,
-            current_text,
-            prompt_path,
-            canon_content,
-            subconscious_content,
-            yaml_storage,
+            chapter_path, project_root, task_message, prompt_path,
+            canon_content, subconscious_content, active_characters, yaml_storage,
+        )
+    elif strategy == ContextStrategy.STANDARD:
+        return _assemble_standard(
+            chapter_path, project_root, task_message, prompt_path,
+            canon_content, subconscious_content, active_characters, yaml_storage,
         )
     else:
         return _assemble_frugal(
-            chapter_path,
-            project_root,
-            current_text,
-            prompt_path,
-            canon_content,
-            subconscious_content,
-            yaml_storage,
+            chapter_path, project_root, task_message, prompt_path,
+            canon_content, subconscious_content, active_characters, yaml_storage,
         )
 
 
@@ -260,12 +297,13 @@ def assemble_actor_context(
 
 
 def _assemble_frugal(
-    chapter_path: Path,
+    chapter_path: Path | None,
     project_root: Path,
-    current_text: str,
-    prompt_path: Path | None,
+    task_message: str,
+    prompt_path: Path,
     canon_content: str,
     subconscious_content: str,
+    active_characters: list[str] | None,
     yaml_storage: YAMLStorage | None,
 ) -> list[dict[str, str]]:
     """FRUGAL 策略：固定 8K 预算，按比例分配各层级。"""
@@ -294,12 +332,16 @@ def _assemble_frugal(
         messages.append(msg)
         total_tokens += canon_tokens
 
-    # 3. 角色状态 (STATE MEMORY | MEDIUM) — 仅 POV 角色
+    # 3. 角色状态 (STATE MEMORY | MEDIUM) — POV 角色或显式指定的角色
     state_budget = int(INPUT_TOKEN_BUDGET * BUDGET_RATIOS[AuthorityLevel.STATE_MEMORY])
     storage = yaml_storage or YAMLStorage()
-    pov_id = storage.extract_pov_character_id(chapter_path)
-    if pov_id:
-        char_path = project_root / "characters" / f"{pov_id}.md"
+    chars_to_load = active_characters or []
+    if not chars_to_load and chapter_path:
+        pov_id = storage.extract_pov_character_id(chapter_path)
+        if pov_id:
+            chars_to_load = [pov_id]
+    for char_id in chars_to_load[:1]:  # FRUGAL 只取第一个角色
+        char_path = project_root / "characters" / f"{char_id}.md"
         if char_path.exists():
             char_file = storage.read_character_file(char_path)
             state_text = wrap_with_authority_tag(
@@ -330,16 +372,16 @@ def _assemble_frugal(
         messages.append(msg)
         total_tokens += sub_tokens
 
-    # 5. 近期正文
-    text_budget = int(INPUT_TOKEN_BUDGET * BUDGET_RATIOS["recent_text"])
+    # 5. 任务消息（替代硬编码的 CONTINUE:）
+    task_budget = int(INPUT_TOKEN_BUDGET * BUDGET_RATIOS["recent_text"])
     remaining_budget = INPUT_TOKEN_BUDGET - total_tokens
-    actual_text_budget = min(text_budget, remaining_budget)
-    if actual_text_budget > 0 and current_text:
-        text_tokens = counter.count(current_text)
-        if text_tokens > actual_text_budget:
-            current_text = counter.truncate_to_budget(current_text, actual_text_budget)
-        msg = ContextMessage(role="user", content=f"[Previous Text]\n{current_text}\n\nCONTINUE:")
-        msg.token_count = counter.count(current_text)
+    actual_task_budget = min(task_budget, remaining_budget)
+    if actual_task_budget > 0 and task_message:
+        task_tokens = counter.count(task_message)
+        if task_tokens > actual_task_budget:
+            task_message = counter.truncate_to_budget(task_message, actual_task_budget)
+        msg = ContextMessage(role="user", content=task_message)
+        msg.token_count = counter.count(task_message)
         messages.append(msg)
 
     # 熔断检查
@@ -352,12 +394,13 @@ def _assemble_frugal(
 
 
 def _assemble_standard(
-    chapter_path: Path,
+    chapter_path: Path | None,
     project_root: Path,
-    current_text: str,
-    prompt_path: Path | None,
+    task_message: str,
+    prompt_path: Path,
     canon_content: str,
     subconscious_content: str,
+    active_characters: list[str] | None,
     yaml_storage: YAMLStorage | None,
 ) -> list[dict[str, str]]:
     """STANDARD 策略：48K 预算，注入全部活跃角色状态。
@@ -396,10 +439,12 @@ def _assemble_standard(
     # 3. 所有活跃角色状态 (STATE MEMORY) — 分配 30% 预算
     state_budget = int(budget * 0.30)
     storage = yaml_storage or YAMLStorage()
-    active_chars = _extract_active_characters(chapter_path, storage)
+    chars_to_load = active_characters or []
+    if not chars_to_load and chapter_path:
+        chars_to_load = _extract_active_characters(chapter_path, storage)
     state_used = 0
 
-    for char_id in active_chars:
+    for char_id in chars_to_load:
         if state_used >= state_budget:
             break
         char_path = project_root / "characters" / f"{char_id}.md"
@@ -436,14 +481,14 @@ def _assemble_standard(
         messages.append(msg)
         total_tokens += sub_tokens
 
-    # 5. 近期正文 — 使用剩余预算
+    # 5. 任务消息 — 使用剩余预算
     remaining_budget = budget - total_tokens
-    if remaining_budget > 0 and current_text:
-        text_tokens = counter.count(current_text)
-        if text_tokens > remaining_budget:
-            current_text = counter.truncate_to_budget(current_text, remaining_budget)
-        msg = ContextMessage(role="user", content=f"[Previous Text]\n{current_text}\n\nCONTINUE:")
-        msg.token_count = counter.count(current_text)
+    if remaining_budget > 0 and task_message:
+        task_tokens = counter.count(task_message)
+        if task_tokens > remaining_budget:
+            task_message = counter.truncate_to_budget(task_message, remaining_budget)
+        msg = ContextMessage(role="user", content=task_message)
+        msg.token_count = counter.count(task_message)
         messages.append(msg)
 
     # 熔断检查
@@ -456,12 +501,13 @@ def _assemble_standard(
 
 
 def _assemble_panoramic(
-    chapter_path: Path,
+    chapter_path: Path | None,
     project_root: Path,
-    current_text: str,
-    prompt_path: Path | None,
+    task_message: str,
+    prompt_path: Path,
     canon_content: str,
     subconscious_content: str,
+    active_characters: list[str] | None,
     yaml_storage: YAMLStorage | None,
 ) -> list[dict[str, str]]:
     """PANORAMIC 策略：128K 软限，全量设定 + 全量潜意识 + 全部角色。
@@ -470,6 +516,7 @@ def _assemble_panoramic(
     - 软限 128K（即使模型支持 1M，防止延迟失控）
     - 设定和潜意识不做截断，全量注入
     - 注入所有活跃角色状态
+    - 历史章节倒序注入（需要 chapter_path）
     """
     counter = TokenCounter()
     messages: list[ContextMessage] = []
@@ -495,9 +542,11 @@ def _assemble_panoramic(
 
     # 3. 所有活跃角色状态 (STATE MEMORY) — 全量注入
     storage = yaml_storage or YAMLStorage()
-    active_chars = _extract_active_characters(chapter_path, storage)
+    chars_to_load = active_characters or []
+    if not chars_to_load and chapter_path:
+        chars_to_load = _extract_active_characters(chapter_path, storage)
 
-    for char_id in active_chars:
+    for char_id in chars_to_load:
         char_path = project_root / "characters" / f"{char_id}.md"
         if not char_path.exists():
             continue
@@ -523,9 +572,9 @@ def _assemble_panoramic(
         messages.append(msg)
         total_tokens += sub_tokens
 
-    # 5. 历史章节倒序注入 — PANORAMIC 独有
+    # 5. 历史章节倒序注入 — PANORAMIC 独有（需要 chapter_path）
     remaining_budget = budget - total_tokens
-    if remaining_budget > 0:
+    if remaining_budget > 0 and chapter_path:
         history_text = _load_previous_chapters(
             chapter_path, project_root, counter, remaining_budget
         )
@@ -538,14 +587,14 @@ def _assemble_panoramic(
             messages.append(msg)
             total_tokens += msg.token_count
 
-    # 6. 当前正文 — 使用剩余预算
+    # 6. 任务消息 — 使用剩余预算
     remaining_budget = budget - total_tokens
-    if remaining_budget > 0 and current_text:
-        text_tokens = counter.count(current_text)
-        if text_tokens > remaining_budget:
-            current_text = counter.truncate_to_budget(current_text, remaining_budget)
-        msg = ContextMessage(role="user", content=f"[Previous Text]\n{current_text}\n\nCONTINUE:")
-        msg.token_count = counter.count(current_text)
+    if remaining_budget > 0 and task_message:
+        task_tokens = counter.count(task_message)
+        if task_tokens > remaining_budget:
+            task_message = counter.truncate_to_budget(task_message, remaining_budget)
+        msg = ContextMessage(role="user", content=task_message)
+        msg.token_count = counter.count(task_message)
         messages.append(msg)
 
     # 熔断检查

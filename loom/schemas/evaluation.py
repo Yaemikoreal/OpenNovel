@@ -22,6 +22,47 @@ class DimensionScore(BaseModel):
         return v
 
 
+class AnchoredIssue(BaseModel):
+    """带文本定位的评审问题。
+
+    与纯文本 issue 不同，AnchoredIssue 通过 quote 字段锚定到章节原文的具体位置，
+    让 Writer 的 revise() 能精确定位修改位置。
+    """
+
+    dimension: str
+    """所属评分维度，如 "情节逻辑"、"角色一致性"。"""
+
+    severity: str
+    """严重程度：critical（硬伤，必须修改）/ major（明显问题）/ minor（建议优化）。"""
+
+    quote: str
+    """原文引用（20-50 字），作为定位锚点。"""
+
+    problem: str
+    """问题描述。"""
+
+    suggestion: str
+    """修改建议。"""
+
+    location_hint: str = ""
+    """人类可读的位置提示，如 "第 3 段"、"场景 2 开头"。"""
+
+    @field_validator("severity")
+    @classmethod
+    def validate_severity(cls, v: str) -> str:
+        allowed = {"critical", "major", "minor"}
+        if v not in allowed:
+            raise ValueError(f"severity 必须是 {allowed} 之一，收到: {v}")
+        return v
+
+    @field_validator("quote")
+    @classmethod
+    def validate_quote(cls, v: str) -> str:
+        if not v or len(v.strip()) < 5:
+            raise ValueError("quote 必须包含至少 5 个字符的原文引用")
+        return v.strip()
+
+
 class ChapterEvaluation(BaseModel):
     """Critic 输出的章节评分结果。"""
 
@@ -30,6 +71,7 @@ class ChapterEvaluation(BaseModel):
     summary: str
     issues: list[str]
     suggestions: list[str]
+    anchored_issues: list[AnchoredIssue] = []
 
     @field_validator("total_score")
     @classmethod
@@ -54,3 +96,8 @@ class ChapterEvaluation(BaseModel):
     def is_excellent(self) -> bool:
         """是否优秀 (>=90 分)。"""
         return self.total_score >= 90
+
+    @property
+    def has_anchored_issues(self) -> bool:
+        """是否包含锚定问题。"""
+        return len(self.anchored_issues) > 0
