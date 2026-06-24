@@ -11,7 +11,10 @@ from pathlib import Path
 from opennovel.core.context_assembler import ContextStrategy, assemble_context
 from opennovel.core.hybrid_retriever import HybridRetriever
 from opennovel.core.llm import LLMBus
+from opennovel.core.mutation_strategy import build_mutation_prompt_hint, select_mutation_plan
 from opennovel.core.retriever import Retriever
+from opennovel.schemas.evaluation import ChapterEvaluation
+from opennovel.schemas.mutation import MutationDimension
 from opennovel.schemas.outline import ChapterOutline
 from opennovel.storage.sqlite import EventStore
 
@@ -291,11 +294,15 @@ class Writer:
         n_variants: int = 3,
         variation_mode: str = "exploratory",
         corrective_feedback: str = "",
+        previous_evaluation: ChapterEvaluation | None = None,
+        used_dimensions: list[MutationDimension] | None = None,
+        is_climax: bool = False,
     ) -> list[ChapterOutline]:
-        """盲目变异：生成多个叙事方向的大纲方案。
+        """结构性变异：生成多个叙事方向的大纲方案。
 
-        探索型变异：不同 temperature 生成多样化方向。
-        纠错型变异：将 Critic 反馈作为负向约束注入。
+        支持两种变异模式：
+        - exploratory（探索型）：策略引擎随机选择维度 + 不同 temperature
+        - corrective（纠错型）：针对评审薄弱维度进行结构性变异
 
         Args:
             chapter_id: 章节 ID
@@ -304,12 +311,14 @@ class Writer:
             n_variants: 生成方案数量
             variation_mode: "exploratory"（探索型）或 "corrective"（纠错型）
             corrective_feedback: 纠错模式下的 Critic 反馈
+            previous_evaluation: 前一章评审结果（纠错型模式使用）
+            used_dimensions: 已使用过的变异维度（避免重复）
+            is_climax: 是否为高潮章节
 
         Returns:
             大纲方案列表（长度 = n_variants）
         """
         temperatures = [0.5, 0.7, 0.9][:n_variants]
-        # 补齐温度列表，上限 1.0
         while len(temperatures) < n_variants:
             temperatures.append(min(temperatures[-1] + 0.15, 1.0))
 
@@ -319,17 +328,35 @@ class Writer:
             "请尝试一个以世界观揭示或秘密揭露为核心的叙事方向。",
         ]
 
+        # 为每个方案生成独立的变异计划
+        mutation_plans = []
+        for _i in range(n_variants):
+            plan = select_mutation_plan(
+                evaluation=previous_evaluation,
+                used_dimensions=used_dimensions,
+                is_climax=is_climax,
+                variation_mode=variation_mode,
+            )
+            mutation_plans.append(plan)
+
         outlines: list[ChapterOutline] = []
         for i in range(n_variants):
-            # 构建任务消息
             task_message = self._build_think_task_message(
                 chapter_id,
                 chapter_outline_hint,
                 previous_summary,
             )
 
-            # 探索型：添加方向提示
-            if variation_mode == "exploratory":
+            # 注入结构性变异指令（Phase 2.4）
+            plan = mutation_plans[i]
+            if plan.templates:
+                mutation_hint = build_mutation_prompt_hint(plan)
+                task_message += f"\n\n### 结构变异方案 {i + 1}\n{mutation_hint}"
+                if plan.rationale:
+                    task_message += f"\n变异理由: {plan.rationale}"
+
+            # 探索型：添加方向提示（补充结构性变异）
+            if variation_mode == "exploratory" and not plan.templates:
                 hint = direction_hints[i % len(direction_hints)]
                 task_message += f"\n\n### 创作方向提示（方案 {i + 1}）\n{hint}"
 

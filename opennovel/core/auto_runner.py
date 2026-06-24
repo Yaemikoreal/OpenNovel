@@ -284,7 +284,7 @@ class AutoRunner:
             # 多方案生成 → Critic 预审 → 选择最佳
             n_variants = 3
             self._log(
-                f"盲目变异触发: {mode} 模式, {n_variants} 个方案",
+                f"结构性变异触发: {mode} 模式, {n_variants} 个方案",
                 "info",
             )
             with self.metrics.trace("writer", "think_variations", chapter_id):
@@ -295,6 +295,11 @@ class AutoRunner:
                     n_variants=n_variants,
                     variation_mode=mode,
                     corrective_feedback=feedback,
+                    previous_evaluation=prev_result.evaluation if prev_result else None,
+                    is_climax=any(
+                        kw in chapter_hint.lower()
+                        for kw in ["转折", "高潮", "climax", "决战", "大结局", "finale"]
+                    ),
                 )
 
             # Critic 预审每个方案
