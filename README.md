@@ -20,125 +20,49 @@
   <a href="https://github.com/Yaemikoreal/LOOM/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/Yaemikoreal/LOOM/ci.yml?branch=main&style=flat-square&label=CI" alt="CI">
   </a>
-  <a href="https://codecov.io/gh/Yaemikoreal/LOOM">
-    <img src="https://img.shields.io/codecov/c/github/Yaemikoreal/LOOM?style=flat-square&token=YOUR_TOKEN" alt="Coverage">
-  </a>
   <a href="https://github.com/astral-sh/ruff">
     <img src="https://img.shields.io/badge/code%20style-ruff-261230?style=flat-square" alt="Ruff">
-  </a>
-  <a href="https://github.com/Yaemikoreal/LOOM/blob/main/CODE_OF_CONDUCT.md">
-    <img src="https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa?style=flat-square" alt="Code of Conduct">
   </a>
   <a href="https://github.com/Yaemikoreal/LOOM/releases">
     <img src="https://img.shields.io/github/v/release/Yaemikoreal/LOOM?style=flat-square&color=8B5CF6" alt="Latest Release">
   </a>
 </p>
 
-<p align="center">
-  <a href="#-特性">特性</a> •
-  <a href="#-快速开始">快速开始</a> •
-  <a href="#-CLI-命令">CLI 命令</a> •
-  <a href="#-架构">架构</a> •
-  <a href="#-贡献">贡献</a> •
-  <a href="#-许可证">许可证</a>
-</p>
-
 ---
 
-## 🔍 简介
+## 简介
 
-**L.O.O.M.** 不是"一键生成小说"的玩具——它是写作者的**数字织机**与**记忆外脑**。
+**L.O.O.M.** 是面向长篇小说创作的叙事操作系统。它不是"一键生成小说"的玩具，而是写作者的数字织机与记忆外脑。
 
 > 你写故事，L.O.O.M. 记住故事的每一个细节。
 
 传统写作工具要么过于简单（纯文本编辑器），要么过于复杂（项目管理式写作软件）。L.O.O.M. 走了第三条路：
 
-- **Human Layer**: 你只写纯 Markdown，就像在 Obsidian 或 VSCode 中一样自在
-- **Machine Shadow**: AI 在后台自动提取状态、追踪事件、维护设定一致性
-- **Semantic Layer**: 向量引擎让"我记得某章写过…"成为可搜索的语义记忆
-
-### 为何叫 L.O.O.M.?
-
-"Loom" 意为织布机——正如织工将经纬线交织成布，L.O.O.M. 将你的灵感丝线编织成有机生长的故事。
+- **Human Layer** — 作者只写纯 Markdown，兼容 Obsidian、VSCode 等任意编辑器
+- **Machine Shadow** — AI 在后台自动提取角色状态、追踪事件因果、维护设定一致性
+- **Semantic Layer** — 向量引擎将历史文本转化为可召回的语义记忆
 
 ---
 
-## ✨ 特性
+## 特性
 
-<table>
-<tr>
-<td width="50%">
+**四 Agent 自主创作** — Writer 负责思考规划与沉浸式创作，Critic 进行五维百分制评分与锚定反馈，Manager 自动提取角色状态变更，Director 全局叙事分析并注入策略指导。单章最多 5 次重试，确保质量。
 
-### 📝 纯 Markdown 创作
-- 用你最喜欢的编辑器写故事
-- YAML Frontmatter 由系统自动管理
-- 零学习成本，零格式污染
-</td>
-<td width="50%">
+**盲目变异** — 关键章节自动生成 3 个叙事方向的大纲方案，Critic 预审评分后选择最佳方案。支持探索型（最大化差异性）和纠错型（带着问题去变异）两种模式。
 
-### 🤖 四 Agent 自主创作
-- Writer 思考规划 + 沉浸式创作 + 多方案变异
-- Critic 五维 100 分制评分 + 大纲三维预审 + 锚定反馈
-- Manager 自动提取角色状态变更
-- Director 全局叙事分析 + 策略指导注入
-- 单章最多 5 次重试，确保质量
-</td>
-</tr>
-<tr>
-<td width="50%">
+**锚定反馈** — Critic 的评审意见锚定到具体原文段落，Writer 的修订指令精确到"找到引用位置，针对性修改"，而非模糊的"改一下这里"。
 
-### 🔐 零信任安全
-- AI 只能提议，你才是最终决策者
-- `loom commit` 强制 Diff 审阅
-- 一键回滚恢复任何错误
-</td>
-<td width="50%">
+**零信任安全** — AI 只能提议，人类拥有最终否决权。`loom commit` 强制 Diff 审阅，`loom rollback` 一键回滚到任意历史快照。
 
-### 🔄 模型无关
-- 通过 LiteLLM 总线连接任何 LLM
-- 支持 OpenAI / Anthropic / DeepSeek / Ollama / 本地模型
-- 支持 Writer/Critic/Manager 独立配置模型
-</td>
-</tr>
-<tr>
-<td width="50%">
+**模型无关** — 通过 LiteLLM 总线连接任意 LLM（OpenAI / Anthropic / DeepSeek / Ollama / 本地模型）。Writer、Critic、Manager、Director 可独立配置不同模型。
 
-### 🌱 有机生长
-- 灵感碎片自动汇入潜意识池
-- 世界在你写作中自然扩展
-- 支持增量快照、因果压强追踪
-</td>
-<td width="50%">
+**MCP Server 集成** — 暴露 4 个 MCP Tools 供 Claude Code 等 AI Agent 调用，stdio 传输，开箱即用。
 
-### 🔌 MCP Server 集成
-- 暴露 4 个 MCP Tools 供 Claude Code 等 Agent 调用
-- `init_project` / `get_status` / `write_chapter` / `auto_create`
-- stdio 传输，开箱即用
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-### 📦 纯本地优先
-- 所有数据在本地 SQLite + Markdown
-- 可被 git 追踪、Obsidian 打开
-- 无需注册、无需云账号、零数据泄漏
-</td>
-<td width="50%">
-
-### 🎯 全自动模式
-- `loom auto` 一键自主创作整部小说
-- 输入大纲 + 角色 + 世界观 → 输出完整章节
-- 盲目变异：关键章节自动生成 3 个大纲方案，Critic 预审选择最佳
-- Director 全局分析：每章结束后自动评估节奏/张力/角色弧线，注入策略指导
-- 每章写入前自动快照，写入后一致性校验，支持一键回滚
-</td>
-</tr>
-</table>
+**纯本地优先** — 所有数据存储在本地 SQLite + Markdown 文件中，可被 git 追踪、Obsidian 打开，无需注册、无需云账号。
 
 ---
 
-## ⚡ 快速开始
+## 快速开始
 
 ### 安装
 
@@ -155,85 +79,195 @@ cd LOOM
 pip install -e ".[dev]"
 ```
 
-### 五分钟体验
+### 交互式创作
 
 ```bash
-# 1. 创建新小说项目
-loom init ./my-epic
+# 初始化项目
+loom init ./my-novel
 
-# 2. 添加角色
-echo "---
-char_001:
-  name: 林夜
-  role: protagonist
----
-林夜站在废弃的观象台上，风呼啸着穿过断裂的穹顶。" > ./my-epic/characters/char_001.md
+# 编辑角色文件 (characters/char_001.md)
+# 编辑世界观设定 (canon/world_rules.md)
+# 编辑大纲 (outlines/outline.md)
 
-# 3. 开始写作
-loom write ./my-epic/draft/ch_001.md
+# 开始写作（AI 续写循环）
+loom write ./my-novel/draft/ch_001.md
 
-# 4. 存入灵感（可选）
-loom stash "深渊不会主动吞噬你——它只是让你自己跳下去。" --tag 金句 --tag 哲学
+# 存入灵感碎片
+loom stash "深渊不会主动吞噬你——它只是让你自己跳下去。" --tag 金句
 
-# 5. 审阅状态变更
-loom commit ./my-epic/draft/ch_001.md
+# 审阅状态变更（5 步流程：快照 → 提取 → Diff → 确认 → 固化）
+loom commit ./my-novel/draft/ch_001.md
 ```
 
-### 全自动创作
+### 全自动创作（推荐）
+
+全自动创作是 L.O.O.M. 的核心能力。准备好大纲、角色、世界观后，一条命令即可生成完整小说。
+
+**第一步：初始化项目**
 
 ```bash
-# 准备大纲文件 (outlines/outline.md) 和 loom.yaml 配置
-# 然后一键生成整部小说
-loom auto ./my-epic --chapters 7
+loom init ./my-novel
+cd my-novel
+```
 
-# 四 Agent 流水线：Writer → Critic → Manager → Director
-# 每章经过五维评分，≥80 分通过，最多 5 次重试
-# Director 每章结束后分析全局叙事状态，自动注入策略指导
-# 关键章节触发盲目变异：3 个大纲方案 → Critic 预审 → 选择最佳
+**第二步：配置 `loom.yaml`**
+
+```yaml
+model: openai/gpt-4o
+creative_direction: |
+  末世生存题材，聚焦情感与生存的悖论。
+  风格克制、内敛，用细节和动作传递情感。
+target_chapters: 7
+words_per_chapter: 3000
+outline: outlines/outline.md
+
+# 每个 Agent 可独立配置模型
+agents:
+  writer:
+    model: openai/gpt-4o
+  critic:
+    model: openai/gpt-4o
+  manager:
+    model: openai/gpt-4o
+  director:
+    model: openai/gpt-4o
+```
+
+**第三步：编写大纲 (`outlines/outline.md`)**
+
+```markdown
+# 小说标题
+
+## 第一章：开篇描述
+
+本章的场景、角色、情节要点。
+
+## 第二章：发展描述
+
+...
+```
+
+**第四步：创建角色档案 (`characters/char_001.md`)**
+
+```markdown
+---
+id: char_001
+name: 陈远
+location: loc_gas_station
+emotional:
+  grief: 0.6
+  anger: 0.3
+  fear: 0.4
+  joy: 0.1
+  determination: 0.7
+inventory:
+  - 女儿的蜡笔画（心锚）
+  - 老旧瑞士军刀
+---
+
+# 陈远
+
+三十五岁的前物流工人，沉默寡言，行动派...
+```
+
+**第五步：运行自主创作**
+
+```bash
+loom auto . --chapters 7
+```
+
+系统将自动执行四 Agent 流水线：
+
+1. **Writer** 思考规划（生成结构化大纲）→ 沉浸式创作（输出章节正文）
+2. **Critic** 五维评分（文笔/情节/角色/节奏/情感，每项 20 分，满分 100）
+3. 评分 < 80 分时，Writer 根据 Critic 的锚定反馈修订，最多重试 5 次
+4. **Manager** 从合格章节中提取角色状态变更，写入 YAML Frontmatter 和 SQLite 事件账本
+5. **Director** 分析全局叙事状态（评分趋势、因果压力、角色弧线），注入策略指导到下一章
+6. 关键章节（高潮/转折）触发盲目变异：生成 3 个大纲方案，Critic 预审选择最佳
+
+每章写入前自动创建快照，写入后运行一致性校验。全部完成后生成 `run_log.md` 创作日志。
+
+**实际输出示例**
+
+《最后的信号》— 由四 Agent 流水线自主生成的 7 章末世生存小说：
+
+- 总字数：31,933
+- 平均评分：84.4 / 100
+- 章节评分范围：81 – 88
+- 创作耗时：约 50 分钟（含 Director 分析和盲目变异）
+
+---
+
+## CLI 命令
+
+| 命令 | 功能 |
+|:---|:---|
+| `loom init <path>` | 初始化小说项目目录 |
+| `loom write <file>` | 沉浸式 AI 续写循环 |
+| `loom auto <path>` | 四 Agent 全自动创作 |
+| `loom stash <text>` | 存入灵感潜意识池 |
+| `loom commit <file>` | 5 步审阅流程固化状态 |
+| `loom rollback <snapshot>` | 回滚到指定快照 |
+| `loom diff <file>` | 正文与 Shadow 一致性校验 |
+| `loom doctor <path>` | 世界线健康度诊断 |
+
+详细文档：`loom --help` 或查看 [CLAUDE.md](CLAUDE.md)。
+
+---
+
+## MCP Server 集成
+
+L.O.O.M. 提供 MCP (Model Context Protocol) Server，让 Claude Code 等 AI Agent 通过标准协议调用创作能力。
+
+### 工具列表
+
+| Tool | 功能 | 输入 | 输出 |
+|:---|:---|:---|:---|
+| `init_project` | 初始化小说项目 | `path`: 项目路径 | 目录结构和模板文件 |
+| `get_status` | 读取项目状态 | `path`: 项目路径 | 配置、角色、章节、大纲信息 |
+| `write_chapter` | 单章创作 | `path`, `chapter_id`, `chapter_hint` | 章节正文 + 五维评分 + 维度详情 |
+| `auto_create` | 全自动创作 | `path`, `chapters?`: 章节数 | 完整小说 + 创作日志 |
+
+### 配置方式
+
+在项目根目录或全局 Claude Code 配置中添加 `.mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "loom": {
+      "command": "loom-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
+}
+```
+
+### 使用场景
+
+在 Claude Code 中直接调用：
+
+```
+# 初始化一个新小说项目
+请用 loom 初始化一个项目到 ./my-novel
+
+# 查看项目状态
+请查看 ./my-novel 的当前状态
+
+# 全自动创作
+请用 loom 为 ./my-novel 自主创作 7 章
 ```
 
 ---
 
-## 📟 CLI 命令
-
-| 命令 | 功能 | 状态 |
-|:---|:---|:---|
-| `loom init <path>` | 初始化小说项目目录 | ✅ |
-| `loom write <file>` | 沉浸式 AI 续写循环 | ✅ |
-| `loom auto <path>` | 三 Agent 全自动创作 | ✅ |
-| `loom stash <text>` | 存入灵感潜意识池 | ✅ |
-| `loom commit <file>` | 5 步审阅流程固化状态 | ✅ |
-| `loom rollback <snapshot>` | 回滚到指定快照 | ✅ |
-| `loom diff <file>` | 正文 / Shadow 一致性校验 | ✅ |
-| `loom doctor <path>` | 世界线健康度诊断 | ✅ |
-
-详细命令文档：`loom --help` 或查看 [CLAUDE.md](CLAUDE.md)。
-
-### 演示项目
-
-`test_novel/` 包含一个由 LOOM 自主创作系统完整生成的 7 章末世生存小说《最后的信号》：
-
-| 章节 | 标题 | 字数 | 评分 |
-|:---|:---|---:|---:|
-| ch_001 | 灰烬中的敲门声 | 4708 | 83 |
-| ch_002 | 潮汐来袭 | 3951 | 83 |
-| ch_003 | 残缺的白衣 | 4508 | 81 |
-| ch_004 | 灰潮带 | 4705 | 85 |
-| ch_005 | 碎光与余温 | 4638 | 88 |
-| ch_006 | 信号 | 4522 | 85 |
-| ch_007 | 灯塔 | 4901 | 86 |
-
-全部 7 章由 Writer→Critic→Manager→Director 四 Agent 流水线自动生成，平均分 84.4，总字数 31,933。
-
----
-
-## 🏗️ 架构
+## 架构
 
 ```
 ╔══════════════════════════════════╗
-║        Human Layer (创作层)       ║  ← 你只写 Markdown
+║        Human Layer (创作层)       ║  ← 作者只写 Markdown
 ╠══════════════════════════════════╣
-║       Machine Shadow (状态层)     ║  ← AI 自动提取
+║       Machine Shadow (状态层)     ║  ← AI 自动提取状态
 ╠══════════════════════════════════╣
 ║      Semantic Layer (语义层)      ║  ← 向量检索记忆
 ╚══════════════════════════════════╝
@@ -247,14 +281,12 @@ loom auto ./my-epic --chapters 7
 | **Machine Shadow** | YAML Frontmatter + SQLite 事件账本 + Snapshots | `python-frontmatter` + `SQLModel` |
 | **Semantic Layer** | LlamaIndex + BGE-M3 向量索引 | `LlamaIndex` + `sentence-transformers` |
 
-### 四条防爆铁律
+### 设计原则
 
-```
-铁律 1: ID 即锚点     → 全局 Canonical IDs，绑定不绑定名
-铁律 2: 权威分级       → CANON > STATE MEMORY > SUBCONSCIOUS
-铁律 3: 人工审核关口   → AI 只提议，人类决定
-铁律 4: 操作可逆       → 破坏前快照，出错可回滚
-```
+- **ID 即锚点** — 全局 Canonical IDs（`char_001`、`loc_london`），严禁用角色名做关联
+- **权威分级** — `[CANON] > [STATE MEMORY] > [SUBCONSCIOUS]`，灵感不可作为设定执行
+- **人工审核关口** — AI 只能提议，人类拥有最终否决权
+- **操作可逆** — 破坏性写入前必须生成 Snapshot，支持 `loom rollback` 秒级恢复
 
 ### 技术栈
 
@@ -271,28 +303,23 @@ loom auto ./my-epic --chapters 7
 
 ---
 
-## 🧪 开发
+## 开发
 
 ```bash
-# 克隆
 git clone https://github.com/Yaemikoreal/LOOM.git
 cd LOOM
 
-# 虚拟环境
 python -m venv .venv
-.venv\Scripts\activate  # Windows
-source .venv/bin/activate  # macOS/Linux
+.venv\Scripts\activate        # Windows
+source .venv/bin/activate     # macOS / Linux
 
-# 安装开发依赖
 pip install -e ".[dev]"
 
-# 运行测试
+# 测试
 pytest -v --tb=short
-
-# 带覆盖率
 pytest --cov=loom --cov-report=term-missing
 
-# 代码检查
+# 代码质量
 ruff check loom/ tests/
 ruff format --check loom/ tests/
 mypy loom/
@@ -305,12 +332,12 @@ loom/
 ├── cli/                     # Typer CLI 命令入口
 │   ├── main.py              # loom 根命令
 │   ├── write.py             # loom write
-│   ├── auto.py              # loom auto (三 Agent 全自动)
+│   ├── auto.py              # loom auto (四 Agent 全自动)
 │   ├── commit.py            # loom commit & rollback
 │   └── stash.py             # loom stash
 ├── core/                    # 核心引擎
 │   ├── llm.py               # LiteLLM 封装
-│   ├── auto_runner.py       # 三 Agent 编排器
+│   ├── auto_runner.py       # 四 Agent 编排器
 │   ├── context_assembler.py # 上下文组装 & Token 熔断
 │   ├── retriever.py         # 检索路由
 │   ├── state_manager.py     # 快照/回滚/Diff
@@ -319,10 +346,10 @@ loom/
 ├── agents/                  # 代理人格
 │   ├── actor.py             # Actor 沉浸式续写
 │   ├── auditor.py           # Auditor 状态提取
-│   ├── writer.py            # Writer Agent (思考+创作+修改+变异)
-│   ├── critic.py            # Critic Agent (五维评分+大纲评审+锚定反馈)
-│   ├── manager.py           # Manager Agent (状态提取)
-│   └── director.py          # Director Agent (全局叙事分析+策略指导)
+│   ├── writer.py            # Writer (思考+创作+修改+变异)
+│   ├── critic.py            # Critic (五维评分+大纲评审+锚定反馈)
+│   ├── manager.py           # Manager (状态提取)
+│   └── director.py          # Director (全局叙事分析+策略指导)
 ├── storage/                 # 存储适配
 │   ├── sqlite.py            # SQLite 事件账本
 │   ├── yaml_storage.py      # YAML Frontmatter 安全读写
@@ -348,9 +375,9 @@ loom/
 
 ---
 
-## 🤝 贡献
+## 贡献
 
-欢迎各种形式的贡献！无论是 Bug 报告、功能建议、文档改进还是代码提交。
+欢迎各种形式的贡献。
 
 1. 阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解开发流程
 2. 查看 [Issues](https://github.com/Yaemikoreal/LOOM/issues) 寻找想解决的问题
@@ -359,15 +386,7 @@ loom/
 
 ---
 
-## 📄 许可证
+## 许可证
 
-本项目采用 [MIT 许可证](LICENSE)。  
+本项目采用 [MIT 许可证](LICENSE)。
 请遵守 [行为准则](CODE_OF_CONDUCT.md) 参与社区交流。
-
----
-
-<p align="center">
-  <sub>以 Markdown 为笔，以 LLM 为线，编织你的叙事世界。</sub>
-  <br>
-  <sub>Built with ❤️ for writers who care about consistency.</sub>
-</p>
