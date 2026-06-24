@@ -67,13 +67,6 @@
 ### 安装
 
 ```bash
-# 推荐：使用 pipx 隔离安装
-pipx install loom-narrative
-
-# 或使用 pip
-pip install loom-narrative
-
-# 从源码安装
 git clone https://github.com/Yaemikoreal/LOOM.git
 cd LOOM
 pip install -e ".[dev]"
