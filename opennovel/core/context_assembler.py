@@ -361,7 +361,11 @@ def _assemble_frugal(
     for char_id in chars_to_load[:1]:  # FRUGAL 只取第一个角色
         char_path = project_root / "characters" / f"{char_id}.md"
         if char_path.exists():
-            char_file = storage.read_character_file(char_path)
+            try:
+                char_file = storage.read_character_file(char_path)
+            except Exception as e:
+                logger.warning("读取角色文件失败 %s: %s", char_path, e)
+                continue
             state_text = wrap_with_authority_tag(
                 char_file.frontmatter.model_dump_json(indent=2),
                 AuthorityLevel.STATE_MEMORY,
@@ -468,7 +472,11 @@ def _assemble_standard(
         char_path = project_root / "characters" / f"{char_id}.md"
         if not char_path.exists():
             continue
-        char_file = storage.read_character_file(char_path)
+        try:
+            char_file = storage.read_character_file(char_path)
+        except Exception as e:
+            logger.warning("读取角色文件失败 %s: %s", char_path, e)
+            continue
         state_text = wrap_with_authority_tag(
             char_file.frontmatter.model_dump_json(indent=2),
             AuthorityLevel.STATE_MEMORY,
@@ -568,7 +576,11 @@ def _assemble_panoramic(
         char_path = project_root / "characters" / f"{char_id}.md"
         if not char_path.exists():
             continue
-        char_file = storage.read_character_file(char_path)
+        try:
+            char_file = storage.read_character_file(char_path)
+        except Exception as e:
+            logger.warning("读取角色文件失败 %s: %s", char_path, e)
+            continue
         state_text = wrap_with_authority_tag(
             char_file.frontmatter.model_dump_json(indent=2),
             AuthorityLevel.STATE_MEMORY,

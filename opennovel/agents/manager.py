@@ -252,9 +252,7 @@ class Manager:
                     "Manager 提取 JSON 解析失败 (尝试 %d/%d): %s", attempt + 1, MAX_RETRIES + 1, e
                 )
                 if attempt < MAX_RETRIES:
-                    messages.append(
-                        {"role": "assistant", "content": text if "text" in dir() else ""}
-                    )
+                    messages.append({"role": "assistant", "content": text or ""})
                     messages.append(
                         {
                             "role": "user",

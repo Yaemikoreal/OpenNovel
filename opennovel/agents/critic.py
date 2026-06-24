@@ -54,6 +54,13 @@ class Critic:
             return "你是一位文学评判员。对章节进行百分制评分。"
         return self.prompt_path.read_text(encoding="utf-8")
 
+    def _get_all_character_ids(self) -> list[str]:
+        """获取所有角色 ID。"""
+        chars_dir = self.project_root / "characters"
+        if not chars_dir.exists():
+            return []
+        return sorted([f.stem for f in chars_dir.glob("char_*.md")])
+
     def _build_context(
         self,
         task_message: str,
@@ -89,6 +96,7 @@ class Critic:
             prompt_path=self.prompt_path,
             canon_content=canon_content,
             subconscious_content=subconscious_content,
+            active_characters=self._get_all_character_ids(),
             strategy=ContextStrategy.STANDARD,
         )
 
@@ -196,9 +204,7 @@ class Critic:
                     "Critic 评分 JSON 解析失败 (尝试 %d/%d): %s", attempt + 1, MAX_RETRIES + 1, e
                 )
                 if attempt < MAX_RETRIES:
-                    messages.append(
-                        {"role": "assistant", "content": text if "text" in dir() else ""}
-                    )
+                    messages.append({"role": "assistant", "content": text or ""})
                     messages.append(
                         {
                             "role": "user",
@@ -281,15 +287,15 @@ class Critic:
             previous_summary,
         )
 
-        # 使用大纲专用 prompt
+        # 使用大纲专用 prompt，复用 _build_context 的完整上下文注入
+        original_prompt_path = self.prompt_path
         outline_prompt_path = self.prompt_path.parent / "critic_outline.v1.md"
-
-        messages = assemble_context(
-            project_root=self.project_root,
-            task_message=task_message,
-            prompt_path=outline_prompt_path if outline_prompt_path.exists() else self.prompt_path,
-            strategy=ContextStrategy.STANDARD,
-        )
+        if outline_prompt_path.exists():
+            self.prompt_path = outline_prompt_path
+        try:
+            messages = self._build_context(task_message)
+        finally:
+            self.prompt_path = original_prompt_path
 
         last_error = None
         for attempt in range(MAX_RETRIES + 1):
@@ -314,9 +320,7 @@ class Critic:
                     e,
                 )
                 if attempt < MAX_RETRIES:
-                    messages.append(
-                        {"role": "assistant", "content": text if "text" in dir() else ""}
-                    )
+                    messages.append({"role": "assistant", "content": text or ""})
                     messages.append(
                         {
                             "role": "user",

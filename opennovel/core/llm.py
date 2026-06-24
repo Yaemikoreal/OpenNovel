@@ -92,8 +92,8 @@ class LLMBus:
         call_kwargs: dict[str, Any] = {
             "model": model or self.model,
             "messages": messages,
-            "max_tokens": max_tokens or self.default_max_tokens,
-            "temperature": temperature or self.default_temperature,
+            "max_tokens": max_tokens if max_tokens is not None else self.default_max_tokens,
+            "temperature": temperature if temperature is not None else self.default_temperature,
         }
         if self.api_base:
             call_kwargs["api_base"] = self.api_base
@@ -138,8 +138,8 @@ class LLMBus:
         call_kwargs: dict[str, Any] = {
             "model": model or self.model,
             "messages": messages,
-            "max_tokens": max_tokens or self.default_max_tokens,
-            "temperature": temperature or self.default_temperature,
+            "max_tokens": max_tokens if max_tokens is not None else self.default_max_tokens,
+            "temperature": temperature if temperature is not None else self.default_temperature,
         }
         if self.api_base:
             call_kwargs["api_base"] = self.api_base
@@ -175,8 +175,8 @@ class LLMBus:
         call_kwargs: dict[str, Any] = {
             "model": model or self.model,
             "messages": messages,
-            "max_tokens": max_tokens or self.default_max_tokens,
-            "temperature": temperature or self.default_temperature,
+            "max_tokens": max_tokens if max_tokens is not None else self.default_max_tokens,
+            "temperature": temperature if temperature is not None else self.default_temperature,
             "stream": True,
         }
         if self.api_base:

@@ -372,10 +372,13 @@ class AutoRunner:
             self._log(f"不合格 ({evaluation.total_score} 分)，退回修订", "warning")
 
             chapter_text = self.writer.revise(chapter_id, outline, chapter_text, feedback)
-            word_count = len(chapter_text)
-            self._log(f"Writer 修订完成: {word_count} 字", "success")
+            self._log(f"Writer 修订完成: {len(chapter_text)} 字", "success")
 
-        assert best_evaluation is not None
+        if best_evaluation is None:
+            raise RuntimeError(f"章节 {chapter_id} 创作失败：所有尝试均未通过评审")
+
+        # 使用最高分版本的字数（而非最后一次修订的字数）
+        word_count = len(best_text)
 
         # Step 4: Manager 更新
         console.print(f"[bold]🔄 Manager 更新状态[/bold] {chapter_id}")
@@ -411,7 +414,11 @@ class AutoRunner:
         chapter_meta = {
             "id": chapter_id,
             "title": outline.title,
-            "pov": outline.scenes[0].characters_involved[0] if outline.scenes else "",
+            "pov": (
+                outline.scenes[0].characters_involved[0]
+                if outline.scenes and outline.scenes[0].characters_involved
+                else ""
+            ),
             "active_characters": active_chars,
         }
         self.storage.write_markdown_file(chapter_path, chapter_meta, best_text)

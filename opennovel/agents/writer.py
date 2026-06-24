@@ -48,12 +48,12 @@ class Writer:
         self.words_per_chapter = words_per_chapter
         self.event_store = event_store
 
-    def _load_prompt(self) -> str:
-        """加载 Writer Prompt，文件不存在时返回硬编码兜底。"""
-        if not self.prompt_path.exists():
-            logger.warning("Writer Prompt 文件不存在: %s", self.prompt_path)
-            return "你是一位专业的小说创作者。根据大纲和角色状态进行创作。"
-        return self.prompt_path.read_text(encoding="utf-8")
+    def _get_all_character_ids(self) -> list[str]:
+        """获取所有角色 ID。"""
+        chars_dir = self.project_root / "characters"
+        if not chars_dir.exists():
+            return []
+        return sorted([f.stem for f in chars_dir.glob("char_*.md")])
 
     def _build_context(
         self,
@@ -90,6 +90,7 @@ class Writer:
             prompt_path=self.prompt_path,
             canon_content=canon_content,
             subconscious_content=subconscious_content,
+            active_characters=self._get_all_character_ids(),
             strategy=ContextStrategy.STANDARD,
         )
 
@@ -254,9 +255,7 @@ class Writer:
                     "Writer 思考 JSON 解析失败 (尝试 %d/%d): %s", attempt + 1, MAX_RETRIES + 1, e
                 )
                 if attempt < MAX_RETRIES:
-                    messages.append(
-                        {"role": "assistant", "content": text if "text" in dir() else ""}
-                    )
+                    messages.append({"role": "assistant", "content": text or ""})
                     messages.append(
                         {
                             "role": "user",
@@ -292,9 +291,9 @@ class Writer:
             大纲方案列表（长度 = n_variants）
         """
         temperatures = [0.5, 0.7, 0.9][:n_variants]
-        # 补齐温度列表
+        # 补齐温度列表，上限 1.0
         while len(temperatures) < n_variants:
-            temperatures.append(temperatures[-1] + 0.2)
+            temperatures.append(min(temperatures[-1] + 0.15, 1.0))
 
         direction_hints = [
             "请尝试一个出人意料的叙事方向，打破读者预期。",
@@ -357,9 +356,7 @@ class Writer:
                         e,
                     )
                     if attempt < MAX_RETRIES:
-                        messages.append(
-                            {"role": "assistant", "content": text if "text" in dir() else ""}
-                        )
+                        messages.append({"role": "assistant", "content": text or ""})
                         messages.append(
                             {
                                 "role": "user",

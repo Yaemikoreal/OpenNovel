@@ -40,8 +40,8 @@ class OutlineEvaluation(BaseModel):
     @field_validator("total_score")
     @classmethod
     def validate_total_score(cls, v: int) -> int:
-        if not 0 <= v <= 100:
-            raise ValueError(f"总分必须在 0-100 之间，收到: {v}")
+        if not 0 <= v <= 60:
+            raise ValueError(f"总分必须在 0-60 之间（3 维度 x 20 分），收到: {v}")
         return v
 
     @field_validator("dimensions")

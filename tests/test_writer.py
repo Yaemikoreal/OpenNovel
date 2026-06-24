@@ -548,38 +548,6 @@ class TestWriterRevise:
 # ── Writer Prompt 加载测试 ──
 
 
-class TestWriterLoadPrompt:
-    """Writer._load_prompt Prompt 加载测试。"""
-
-    def test_load_prompt_fallback_when_missing(self, empty_project_root: Path) -> None:
-        """测试 Prompt 文件不存在时返回默认文本。"""
-        bus = MagicMock()
-        ret = MagicMock()
-        writer = Writer(
-            llm_bus=bus,
-            retriever=ret,
-            project_root=empty_project_root,
-            prompt_path=empty_project_root / "nonexistent.md",
-        )
-        prompt = writer._load_prompt()
-        assert "小说创作者" in prompt
-
-    def test_load_prompt_from_file(self, empty_project_root: Path) -> None:
-        """测试从文件加载 Prompt。"""
-        prompt_path = empty_project_root / "writer.v1.md"
-        prompt_path.write_text("你是自定义写作代理。", encoding="utf-8")
-        bus = MagicMock()
-        ret = MagicMock()
-        writer = Writer(
-            llm_bus=bus,
-            retriever=ret,
-            project_root=empty_project_root,
-            prompt_path=prompt_path,
-        )
-        prompt = writer._load_prompt()
-        assert "自定义写作代理" in prompt
-
-
 # ── Writer 解析逻辑测试 ──
 
 

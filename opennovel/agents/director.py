@@ -199,9 +199,7 @@ strategic_guidance、creative_direction_adjustment、warnings。"""
                     e,
                 )
                 if attempt < MAX_RETRIES:
-                    messages.append(
-                        {"role": "assistant", "content": text if "text" in dir() else ""}
-                    )
+                    messages.append({"role": "assistant", "content": text or ""})
                     messages.append(
                         {
                             "role": "user",
