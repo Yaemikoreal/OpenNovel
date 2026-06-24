@@ -22,6 +22,7 @@ from opennovel.core.retriever import Retriever
 from opennovel.core.state_manager import StateManager
 from opennovel.schemas.evaluation import ChapterEvaluation
 from opennovel.schemas.outline import ChapterOutline
+from opennovel.storage.metrics import MetricsStore
 from opennovel.storage.yaml_storage import YAMLStorage
 
 logger = logging.getLogger(__name__)
@@ -73,7 +74,11 @@ class AutoRunner:
         self.storage = YAMLStorage()
         self.log_lines: list[str] = []
 
-        # 初始化三个 Agent 的 LLMBus
+        # 指标数据库（Phase 2.2）
+        metrics_path = project_root / ".novel.metrics.db"
+        self.metrics = MetricsStore(metrics_path)
+
+        # 初始化三个 Agent 的 LLMBus（注入 MetricsStore）
         writer_cfg = config.get_agent_llm_config("writer")
         critic_cfg = config.get_agent_llm_config("critic")
         manager_cfg = config.get_agent_llm_config("manager")
@@ -82,16 +87,22 @@ class AutoRunner:
             model=writer_cfg["model"] or config.model,
             api_base=writer_cfg["api_base"] or config.api_base,
             api_key=writer_cfg["api_key"] or config.api_key,
+            metrics_store=self.metrics,
+            agent_name="writer",
         )
         self.critic_bus = LLMBus(
             model=critic_cfg["model"] or config.model,
             api_base=critic_cfg["api_base"] or config.api_base,
             api_key=critic_cfg["api_key"] or config.api_key,
+            metrics_store=self.metrics,
+            agent_name="critic",
         )
         self.manager_bus = LLMBus(
             model=manager_cfg["model"] or config.model,
             api_base=manager_cfg["api_base"] or config.api_base,
             api_key=manager_cfg["api_key"] or config.api_key,
+            metrics_store=self.metrics,
+            agent_name="manager",
         )
 
         # 初始化组件
@@ -135,6 +146,8 @@ class AutoRunner:
                 model=director_cfg["model"] or config.model,
                 api_base=director_cfg["api_base"] or config.api_base,
                 api_key=director_cfg["api_key"] or config.api_key,
+                metrics_store=self.metrics,
+                agent_name="director",
             )
             self.director = Director(
                 llm_bus=director_bus,
@@ -264,23 +277,25 @@ class AutoRunner:
                 f"盲目变异触发: {mode} 模式, {n_variants} 个方案",
                 "info",
             )
-            outlines = self.writer.think_variations(
-                chapter_id,
-                chapter_hint,
-                previous_summary,
-                n_variants=n_variants,
-                variation_mode=mode,
-                corrective_feedback=feedback,
-            )
+            with self.metrics.trace("writer", "think_variations", chapter_id):
+                outlines = self.writer.think_variations(
+                    chapter_id,
+                    chapter_hint,
+                    previous_summary,
+                    n_variants=n_variants,
+                    variation_mode=mode,
+                    corrective_feedback=feedback,
+                )
 
             # Critic 预审每个方案
             evaluations = []
             for idx, o in enumerate(outlines):
-                eval_result = self.critic.evaluate_outline(
-                    chapter_id,
-                    o,
-                    previous_summary,
-                )
+                with self.metrics.trace("critic", "evaluate_outline", chapter_id):
+                    eval_result = self.critic.evaluate_outline(
+                        chapter_id,
+                        o,
+                        previous_summary,
+                    )
                 evaluations.append(eval_result)
                 self._log(
                     f"方案 {idx + 1}: {eval_result.total_score} 分 "
@@ -302,7 +317,8 @@ class AutoRunner:
                 "success",
             )
         else:
-            outline = self.writer.think(chapter_id, chapter_hint, previous_summary)
+            with self.metrics.trace("writer", "think", chapter_id):
+                outline = self.writer.think(chapter_id, chapter_hint, previous_summary)
 
         self._log(
             f"Writer 思考完成: {len(outline.scenes)} 个场景, 目标 {outline.target_words} 字",
@@ -316,14 +332,16 @@ class AutoRunner:
 
         # 首次创作
         console.print(f"[bold]✍️  Writer 创作[/bold] {chapter_id}")
-        chapter_text = self.writer.write(chapter_id, outline, previous_text)
+        with self.metrics.trace("writer", "write", chapter_id):
+            chapter_text = self.writer.write(chapter_id, outline, previous_text)
         word_count = len(chapter_text)
         self._log(f"Writer 创作完成: {word_count} 字", "success")
 
         for attempt in range(MAX_CHAPTER_RETRIES + 1):
             # Critic 评分
             console.print(f"[bold]📊 Critic 评分[/bold] (第 {attempt + 1} 次)")
-            evaluation = self.critic.evaluate(chapter_id, chapter_text, outline)
+            with self.metrics.trace("critic", "evaluate", chapter_id):
+                evaluation = self.critic.evaluate(chapter_id, chapter_text, outline)
             d = evaluation.dimensions
             score_str = (
                 f"{evaluation.total_score} 分 "
@@ -331,6 +349,15 @@ class AutoRunner:
                 f"节奏{d[3].score} 情感{d[4].score})"
             )
             self._log(f"Critic 评分: {score_str}", "success" if evaluation.is_pass else "warning")
+
+            # 记录评审历史到指标数据库
+            self.metrics.record_evaluation(
+                chapter_id=chapter_id,
+                total_score=evaluation.total_score,
+                dimensions=[d[0].score, d[1].score, d[2].score, d[3].score, d[4].score],
+                is_pass=evaluation.is_pass,
+                retry_count=attempt,
+            )
 
             if evaluation.is_pass:
                 best_text = chapter_text
@@ -371,7 +398,8 @@ class AutoRunner:
             )
             self._log(f"不合格 ({evaluation.total_score} 分)，退回修订", "warning")
 
-            chapter_text = self.writer.revise(chapter_id, outline, chapter_text, feedback)
+            with self.metrics.trace("writer", "revise", chapter_id):
+                chapter_text = self.writer.revise(chapter_id, outline, chapter_text, feedback)
             self._log(f"Writer 修订完成: {len(chapter_text)} 字", "success")
 
         if best_evaluation is None:
@@ -385,7 +413,8 @@ class AutoRunner:
         active_chars = self._get_active_characters()
         manager_result = None
         try:
-            manager_result = self.manager.update(chapter_id, best_text, active_chars)
+            with self.metrics.trace("manager", "update", chapter_id):
+                manager_result = self.manager.update(chapter_id, best_text, active_chars)
             self._log(
                 f"Manager 更新: {len(manager_result.character_updates)} 个角色变更, "
                 f"{len(manager_result.events)} 个事件",
@@ -632,3 +661,14 @@ class AutoRunner:
             )
         else:
             console.print("  一致性校验: [green]全部通过[/green]")
+
+        # Token 消耗统计
+        try:
+            usage = self.metrics.get_usage_by_agent()
+            if usage:
+                total = sum(v["total_tokens"] for v in usage.values())
+                console.print(f"\n  Token 总消耗: {total:,}")
+                for agent, stats in sorted(usage.items()):
+                    console.print(f"    {agent}: {stats['total_tokens']:,}")
+        except Exception:
+            pass

@@ -45,6 +45,8 @@ class LLMBus:
         max_retries: int = 3,
         api_base: str | None = None,
         api_key: str | None = None,
+        metrics_store: Any = None,
+        agent_name: str = "",
     ) -> None:
         """初始化 LLM 总线。
 
@@ -55,6 +57,8 @@ class LLMBus:
             max_retries: 最大重试次数
             api_base: 自定义 API 端点（用于 OpenAI 兼容接口）
             api_key: API 密钥（优先级高于环境变量）
+            metrics_store: 指标数据库实例（可选，用于自动记录 token 消耗）
+            agent_name: Agent 名称（配合 metrics_store 使用）
         """
         self.model = model
         self.default_max_tokens = default_max_tokens
@@ -62,6 +66,8 @@ class LLMBus:
         self.max_retries = max_retries
         self.api_base = api_base
         self.api_key = api_key
+        self.metrics_store = metrics_store
+        self.agent_name = agent_name
 
     @retry(
         retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
@@ -107,6 +113,7 @@ class LLMBus:
             model or self.model,
             getattr(response, "usage", None),
         )
+        self._record_usage(response, model or self.model, kwargs.get("chapter_id", ""))
         return response
 
     @retry(
@@ -148,6 +155,7 @@ class LLMBus:
         call_kwargs.update(kwargs)
 
         response = await acompletion(**call_kwargs)
+        self._record_usage(response, model or self.model, kwargs.get("chapter_id", ""))
         return response
 
     async def achat_stream(
@@ -190,6 +198,25 @@ class LLMBus:
             content = chunk.choices[0].delta.content
             if content:
                 yield content
+
+    def _record_usage(
+        self, response: Any, model: str, chapter_id: str = ""
+    ) -> None:
+        """记录 token 使用量到指标数据库。"""
+        if not self.metrics_store or not self.agent_name:
+            return
+        try:
+            usage = getattr(response, "usage", None)
+            if usage:
+                self.metrics_store.record_token_usage(
+                    agent=self.agent_name,
+                    chapter_id=chapter_id,
+                    model=model,
+                    prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+                    completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
+                )
+        except Exception as e:
+            logger.debug("记录 token 使用量失败: %s", e)
 
 
 def extract_text_from_response(response: dict[str, Any]) -> str:
