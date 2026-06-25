@@ -1,4 +1,9 @@
 <p align="center">
+  <a href="#"><img src="https://img.shields.io/badge/EN-Readme-8B5CF6?style=flat-square" alt="English"></a>
+  <a href="README.zh.md"><img src="https://img.shields.io/badge/中文-文档-555555?style=flat-square" alt="中文"></a>
+</p>
+
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/OpenNovel-2.0.0-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
     <img alt="OpenNovel" src="https://img.shields.io/badge/OpenNovel-2.0.0-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
