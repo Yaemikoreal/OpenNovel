@@ -304,6 +304,23 @@ async def _handle_write_chapter(args: dict) -> str:
         api_key=config.api_key,
     )
     retriever = Retriever(path)
+    # 构建/加载向量索引
+    index_dir = retriever._index_dir
+    if not (index_dir / "canon").exists() or not any((index_dir / "canon").iterdir()):
+        canon_dir = path / "canon"
+        if canon_dir.exists() and any(canon_dir.glob("*.md")):
+            retriever.build_canon_index()
+    else:
+        retriever._canon_store.load_index()
+    if not (index_dir / "subconscious").exists() or not any(
+        (index_dir / "subconscious").iterdir()
+    ):
+        sub_dir = path / "subconscious"
+        if sub_dir.exists() and any(sub_dir.glob("*.md")):
+            retriever.build_subconscious_index()
+    else:
+        retriever._subconscious_store.load_index()
+
     writer = Writer(
         llm_bus=llm_bus,
         retriever=retriever,

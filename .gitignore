@@ -61,6 +61,9 @@ Desktop.ini
 .env.*
 !.env.example
 
+# Debug logs
+debug/
+
 # Project generated
 output/
 novels/

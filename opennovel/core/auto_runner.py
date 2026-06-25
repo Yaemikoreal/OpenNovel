@@ -79,7 +79,10 @@ class AutoRunner:
         metrics_path = project_root / ".novel.metrics.db"
         self.metrics = MetricsStore(metrics_path)
 
-        # 初始化三个 Agent 的 LLMBus（注入 MetricsStore）
+        # Prompt 日志目录
+        prompt_log_dir = project_root / "debug" / "prompts"
+
+        # 初始化三个 Agent 的 LLMBus（注入 MetricsStore + Prompt 日志）
         writer_cfg = config.get_agent_llm_config("writer")
         critic_cfg = config.get_agent_llm_config("critic")
         manager_cfg = config.get_agent_llm_config("manager")
@@ -90,6 +93,7 @@ class AutoRunner:
             api_key=writer_cfg["api_key"] or config.api_key,
             metrics_store=self.metrics,
             agent_name="writer",
+            prompt_log_dir=prompt_log_dir,
         )
         self.critic_bus = LLMBus(
             model=critic_cfg["model"] or config.model,
@@ -97,6 +101,7 @@ class AutoRunner:
             api_key=critic_cfg["api_key"] or config.api_key,
             metrics_store=self.metrics,
             agent_name="critic",
+            prompt_log_dir=prompt_log_dir,
         )
         self.manager_bus = LLMBus(
             model=manager_cfg["model"] or config.model,
@@ -104,10 +109,12 @@ class AutoRunner:
             api_key=manager_cfg["api_key"] or config.api_key,
             metrics_store=self.metrics,
             agent_name="manager",
+            prompt_log_dir=prompt_log_dir,
         )
 
         # 初始化组件
         retriever = Retriever(project_root)
+        self._build_or_load_indexes(retriever)
         self.state_manager = StateManager(project_root)
         self.diff_checker = DiffChecker(project_root, self.storage)
 
@@ -158,12 +165,47 @@ class AutoRunner:
                 api_key=director_cfg["api_key"] or config.api_key,
                 metrics_store=self.metrics,
                 agent_name="director",
+                prompt_log_dir=prompt_log_dir,
             )
             self.director = Director(
                 llm_bus=director_bus,
                 project_root=project_root,
                 event_store=event_store,
             )
+
+    def _build_or_load_indexes(self, retriever: Retriever) -> None:
+        """构建或加载向量索引（canon + subconscious）。
+
+        如果索引已存在则加载，否则从源文件构建。
+        确保 Writer/Critic 能获得世界观和潜意识上下文。
+        """
+        index_dir = retriever._index_dir
+        canon_index = index_dir / "canon"
+        sub_index = index_dir / "subconscious"
+
+        # Canon 索引
+        if canon_index.exists() and any(canon_index.iterdir()):
+            self._log("加载 canon 向量索引...", "info")
+            retriever._canon_store.load_index()
+        else:
+            canon_dir = self.project_root / "canon"
+            if canon_dir.exists() and any(canon_dir.glob("*.md")):
+                self._log("构建 canon 向量索引...", "info")
+                retriever.build_canon_index()
+            else:
+                self._log("canon 目录不存在或为空，跳过索引构建", "info")
+
+        # Subconscious 索引
+        if sub_index.exists() and any(sub_index.iterdir()):
+            self._log("加载 subconscious 向量索引...", "info")
+            retriever._subconscious_store.load_index()
+        else:
+            sub_dir = self.project_root / "subconscious"
+            if sub_dir.exists() and any(sub_dir.glob("*.md")):
+                self._log("构建 subconscious 向量索引...", "info")
+                retriever.build_subconscious_index()
+            else:
+                self._log("subconscious 目录不存在或为空，跳过索引构建", "info")
 
     def _log(self, message: str, level: str = "info") -> None:
         """输出日志到终端和日志列表。"""

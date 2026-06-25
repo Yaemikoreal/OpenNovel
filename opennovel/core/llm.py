@@ -5,10 +5,14 @@
 - 自动重试与限流容错
 - 流式输出支持
 - Token 用量追踪
+- Prompt 日志记录（可选）
 """
 
+import json
 import logging
 from collections.abc import AsyncIterator
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from litellm import acompletion, completion
@@ -47,6 +51,7 @@ class LLMBus:
         api_key: str | None = None,
         metrics_store: Any = None,
         agent_name: str = "",
+        prompt_log_dir: Path | None = None,
     ) -> None:
         """初始化 LLM 总线。
 
@@ -59,6 +64,7 @@ class LLMBus:
             api_key: API 密钥（优先级高于环境变量）
             metrics_store: 指标数据库实例（可选，用于自动记录 token 消耗）
             agent_name: Agent 名称（配合 metrics_store 使用）
+            prompt_log_dir: Prompt 日志目录（可选，记录每次 LLM 调用的完整 Prompt）
         """
         self.model = model
         self.default_max_tokens = default_max_tokens
@@ -68,6 +74,7 @@ class LLMBus:
         self.api_key = api_key
         self.metrics_store = metrics_store
         self.agent_name = agent_name
+        self.prompt_log_dir = prompt_log_dir
 
     @retry(
         retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
@@ -113,6 +120,14 @@ class LLMBus:
             model or self.model,
             getattr(response, "usage", None),
         )
+        # 记录 Prompt 日志
+        response_text = ""
+        try:
+            response_text = response.choices[0].message.content or ""
+        except (AttributeError, IndexError):
+            pass
+        self._log_prompt(messages, model or self.model, response_text)
+
         self._record_usage(response, model or self.model, kwargs.get("chapter_id", ""))
         return response
 
@@ -198,6 +213,42 @@ class LLMBus:
             content = chunk.choices[0].delta.content
             if content:
                 yield content
+
+    def _log_prompt(
+        self,
+        messages: list[dict[str, str]],
+        model: str,
+        response_text: str = "",
+    ) -> None:
+        """记录完整 Prompt 到日志文件。
+
+        Args:
+            messages: 发送给 LLM 的消息列表
+            model: 使用的模型名称
+            response_text: LLM 返回的文本（可选）
+        """
+        if not self.prompt_log_dir:
+            return
+        try:
+            self.prompt_log_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            filename = f"{timestamp}_{self.agent_name or 'unknown'}.json"
+            log_path = self.prompt_log_dir / filename
+
+            log_data = {
+                "timestamp": datetime.now().isoformat(),
+                "agent": self.agent_name,
+                "model": model,
+                "messages": messages,
+                "response": response_text,
+            }
+
+            log_path.write_text(
+                json.dumps(log_data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            logger.debug("Prompt 日志写入失败: %s", e)
 
     def _record_usage(
         self, response: Any, model: str, chapter_id: str = ""
