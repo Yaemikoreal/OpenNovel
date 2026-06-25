@@ -1,70 +1,65 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/OpenNovel-Living%20Organic%20Outline%20Machine-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
-    <img alt="OpenNovel" src="https://img.shields.io/badge/OpenNovel-Living%20Organic%20Outline%20Machine-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
+    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/OpenNovel-2.0.0-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
+    <img alt="OpenNovel" src="https://img.shields.io/badge/OpenNovel-2.0.0-8B5CF6?style=for-the-badge&logo=markdown&logoColor=white&labelColor=1a1a2e">
   </picture>
 </p>
 
 <p align="center">
-  <b>本地优先的长篇小说叙事操作系统</b><br>
-  <i>作者只写 Markdown，系统维护世界观的严丝合缝</i>
-</p>
-
-<p align="center">
   <a href="https://github.com/Yaemikoreal/OpenNovel/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/Yaemikoreal/OpenNovel?color=8B5CF6&style=flat-square" alt="MIT License">
+    <img src="https://img.shields.io/github/license/Yaemikoreal/OpenNovel?color=8B5CF6&style=flat-square" alt="MIT">
   </a>
   <a href="https://www.python.org/downloads/">
     <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=ffd343" alt="Python 3.10+">
   </a>
-  <a href="https://github.com/Yaemikoreal/OpenNovel/actions/workflows/ci.yml">
+  <a href="https://github.com/Yaemikoreal/OpenNovel/actions">
     <img src="https://img.shields.io/github/actions/workflow/status/Yaemikoreal/OpenNovel/ci.yml?branch=main&style=flat-square&label=CI" alt="CI">
   </a>
   <a href="https://github.com/astral-sh/ruff">
-    <img src="https://img.shields.io/badge/code%20style-ruff-261230?style=flat-square" alt="Ruff">
+    <img src="https://img.shields.io/badge/code_style-ruff-261230?style=flat-square" alt="Ruff">
   </a>
   <a href="https://github.com/Yaemikoreal/OpenNovel/releases">
-    <img src="https://img.shields.io/github/v/release/Yaemikoreal/OpenNovel?style=flat-square&color=8B5CF6" alt="Latest Release">
+    <img src="https://img.shields.io/github/v/release/Yaemikoreal/OpenNovel?style=flat-square&color=8B5CF6" alt="Release">
   </a>
+</p>
+
+<p align="center">
+  Local-first long-form novel operating system.<br>
+  Write in Markdown. The system maintains narrative consistency.
 </p>
 
 ---
 
-## 简介
+## Overview
 
-**OpenNovel** 是面向长篇小说创作的叙事操作系统。它不是"一键生成小说"的玩具，而是写作者的数字织机与记忆外脑。
+**OpenNovel** is a CLI-driven narrative operating system for long-form fiction. It is not a "one-click novel generator" — it is a collaborative writing environment where the author controls the story while AI handles the mechanical complexity of state tracking, consistency verification, and iterative refinement.
 
-> 你写故事，OpenNovel 记住故事的每一个细节。
+The system is organized around three decoupled layers:
 
-传统写作工具要么过于简单（纯文本编辑器），要么过于复杂（项目管理式写作软件）。OpenNovel 走了第三条路：
-
-- **Human Layer** — 作者只写纯 Markdown，兼容 Obsidian、VSCode 等任意编辑器
-- **Machine Shadow** — AI 在后台自动提取角色状态、追踪事件因果、维护设定一致性
-- **Semantic Layer** — 向量引擎将历史文本转化为可召回的语义记忆
+- **Human Layer** — Pure Markdown files (canon, characters, drafts). Editable in any text editor, trackable by git, openable in Obsidian.
+- **Machine Shadow** — Structured state extracted by AI: YAML frontmatter, SQLite event ledger, and file-level snapshots.
+- **Semantic Layer** — LlamaIndex-based vector retrieval for contextual memory (BGE-M3 optional).
 
 ---
 
-## 特性
+## Core Features
 
-**四 Agent 自主创作** — Writer 负责思考规划与沉浸式创作，Critic 进行五维百分制评分与锚定反馈，Manager 自动提取角色状态变更，Director 全局叙事分析并注入策略指导。单章最多 5 次重试，确保质量。
-
-**盲目变异** — 关键章节自动生成 3 个叙事方向的大纲方案，Critic 预审评分后选择最佳方案。支持探索型（最大化差异性）和纠错型（带着问题去变异）两种模式。
-
-**锚定反馈** — Critic 的评审意见锚定到具体原文段落，Writer 的修订指令精确到"找到引用位置，针对性修改"，而非模糊的"改一下这里"。
-
-**零信任安全** — AI 只能提议，人类拥有最终否决权。`novel commit` 强制 Diff 审阅，`novel rollback` 一键回滚到任意历史快照。
-
-**模型无关** — 通过 LiteLLM 总线连接任意 LLM（OpenAI / Anthropic / DeepSeek / Ollama / 本地模型）。Writer、Critic、Manager、Director 可独立配置不同模型。
-
-**MCP Server 集成** — 暴露 4 个 MCP Tools 供 Claude Code 等 AI Agent 调用，stdio 传输，开箱即用。
-
-**纯本地优先** — 所有数据存储在本地 SQLite + Markdown 文件中，可被 git 追踪、Obsidian 打开，无需注册、无需云账号。
+- **Four-Agent Autonomous Pipeline** — Writer (planning + creation + revision), Critic (five-dimension scoring + anchored feedback), Manager (state extraction + event recording), Director (global narrative analysis + scheduling proposals). Full pipeline runs on a single command.
+- **Agent Autonomy** — Writer can proactively query missing information mid-creation via tool-calling protocol. SafetyFence constrains recursion depth, token budget, and timeout.
+- **Canon Integrity Checking** — Rule-based validation against world-building documents. Detects violations of established setting rules without LLM dependency.
+- **Causal Event Graph** — NetworkX-based directed acyclic graph of narrative events. Supports path analysis, centrality computation, upstream/downstream causal tracing.
+- **Blind Mutation** — Key chapters generate multiple structural directions via orthogonal mutation dimensions (narrative structure, point of view, causality, thematic arc). Corrective mode targets weak dimensions from prior evaluation.
+- **Stage Model Routing** — Different LLM models per writing stage: cheap model for planning, flagship model for creation, premium model for revision.
+- **Model-Agnostic LLM Bus** — LiteLLM integration supports any provider (OpenAI, Anthropic, DeepSeek, Ollama, local models). Each agent can be independently configured.
+- **Three-Layer Model Fallback** — Agent-level model in novel.yaml, project-level model, global default in `.opennovel.yaml`, hardcoded default. No repeated configuration needed.
+- **Human-in-the-Loop** — AI proposes, human approves. Every state change goes through `novel commit` with diff review. Full rollback support.
+- **MCP Server** — Four tools exposed via Model Context Protocol for Claude Code and other MCP clients.
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 安装
+### Installation
 
 ```bash
 git clone https://github.com/Yaemikoreal/OpenNovel.git
@@ -72,314 +67,389 @@ cd OpenNovel
 pip install -e ".[dev]"
 ```
 
-### 交互式创作
+### Configure API Keys
+
+Set your LLM provider key as an environment variable:
 
 ```bash
-# 初始化项目
-novel init ./my-novel
-
-# 编辑角色文件 (characters/char_001.md)
-# 编辑世界观设定 (canon/world_rules.md)
-# 编辑大纲 (outlines/outline.md)
-
-# 开始写作（AI 续写循环）
-novel write ./my-novel/draft/ch_001.md
-
-# 存入灵感碎片
-novel stash "深渊不会主动吞噬你——它只是让你自己跳下去。" --tag 金句
-
-# 审阅状态变更（5 步流程：快照 → 提取 → Diff → 确认 → 固化）
-novel commit ./my-novel/draft/ch_001.md
+export DEEPSEEK_API_KEY="sk-xxxx"       # DeepSeek
+export OPENAI_API_KEY="sk-xxxx"         # OpenAI
+export ANTHROPIC_API_KEY="sk-ant-xxxx"  # Anthropic
 ```
 
-### 全自动创作（推荐）
-
-全自动创作是 OpenNovel 的核心能力。准备好大纲、角色、世界观后，一条命令即可生成完整小说。
-
-**第一步：初始化项目**
+### Initialize a Project
 
 ```bash
-novel init ./my-novel
-cd my-novel
+# Create project in workspace (novels/<name>/)
+novel init my-novel
+
+# Or create at specific path
+novel init .
 ```
 
-**第二步：配置 `novel.yaml`**
+The workspace is managed by `.opennovel.yaml` at the project root. Default model is `deepseek/deepseek-v4-flash`.
 
-```yaml
-model: openai/gpt-4o
-creative_direction: |
-  末世生存题材，聚焦情感与生存的悖论。
-  风格克制、内敛，用细节和动作传递情感。
-target_chapters: 7
-words_per_chapter: 3000
-outline: outlines/outline.md
-
-# 每个 Agent 可独立配置模型
-agents:
-  writer:
-    model: openai/gpt-4o
-  critic:
-    model: openai/gpt-4o
-  manager:
-    model: openai/gpt-4o
-  director:
-    model: openai/gpt-4o
-```
-
-**第三步：编写大纲 (`outlines/outline.md`)**
-
-```markdown
-# 小说标题
-
-## 第一章：开篇描述
-
-本章的场景、角色、情节要点。
-
-## 第二章：发展描述
-
-...
-```
-
-**第四步：创建角色档案 (`characters/char_001.md`)**
-
-```markdown
----
-id: char_001
-name: 陈远
-location: loc_gas_station
-emotional:
-  grief: 0.6
-  anger: 0.3
-  fear: 0.4
-  joy: 0.1
-  determination: 0.7
-inventory:
-  - 女儿的蜡笔画（心锚）
-  - 老旧瑞士军刀
----
-
-# 陈远
-
-三十五岁的前物流工人，沉默寡言，行动派...
-```
-
-**第五步：运行自主创作**
+### Write Your First Chapter (Interactive)
 
 ```bash
-novel auto . --chapters 7
+# Edit characters, world rules, and outline in your editor
+# Then start AI-assisted writing:
+novel write novels/my-novel/draft/ch_001.md
+
+# Store inspirations:
+novel stash "A sentence fragment" --tag mood
+
+# Review and commit state changes:
+novel commit novels/my-novel/draft/ch_001.md
 ```
 
-系统将自动执行四 Agent 流水线：
+### Run Autonomous Creation
 
-1. **Writer** 思考规划（生成结构化大纲）→ 沉浸式创作（输出章节正文）
-2. **Critic** 五维评分（文笔/情节/角色/节奏/情感，每项 20 分，满分 100）
-3. 评分 < 80 分时，Writer 根据 Critic 的锚定反馈修订，最多重试 5 次
-4. **Manager** 从合格章节中提取角色状态变更，写入 YAML Frontmatter 和 SQLite 事件账本
-5. **Director** 分析全局叙事状态（评分趋势、因果压力、角色弧线），注入策略指导到下一章
-6. 关键章节（高潮/转折）触发盲目变异：生成 3 个大纲方案，Critic 预审选择最佳
+This is the primary workflow. Prepare your project, then execute:
 
-每章写入前自动创建快照，写入后运行一致性校验。全部完成后生成 `run_log.md` 创作日志。
+```bash
+novel auto novels/my-novel
+```
 
-**实际输出示例**
-
-《最后的信号》— 由四 Agent 流水线自主生成的 7 章末世生存小说：
-
-- 总字数：31,933
-- 平均评分：84.4 / 100
-- 章节评分范围：81 – 88
-- 创作耗时：约 50 分钟（含 Director 分析和盲目变异）
+The system processes all chapters sequentially through the Agent pipeline. See the [Autonomous Writing](#autonomous-writing) section for details.
 
 ---
 
-## CLI 命令
+## Autonomous Writing
 
-| 命令 | 功能 |
+The `novel auto` command orchestrates a four-agent pipeline that generates an entire novel from your outline, character files, and world rules.
+
+### Pipeline
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Chapter Loop                         │
+├─────────────────────────────────────────────────────────┤
+│    Writer.think() → structured outline with scenes      │
+│         ↓                                               │
+│    Knowledge Gap Detection → ToolRegistry query         │
+│         ↓                                               │
+│    Writer.write() / write_with_autonomy()               │
+│    (mid-write tool calls via ##TOOL_CALL## protocol)    │
+│         ↓                                               │
+│    Critic.evaluate() → five-dimension score (0-100)     │
+│         ↓                                               │
+│    if score < 80:                                       │
+│      Writer.hot_fix() (targeted paragraph repair)       │
+│      or Writer.revise() (full chapter rewrite)          │
+│      → re-evaluate (max 5 retries)                      │
+│         ↓                                               │
+│    Manager.update() → character state + events          │
+│         ↓                                               │
+│    Snapshot → Diff Check → chapter written              │
+│         ↓                                               │
+│    Director.analyze() → strategy for next chapter       │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Scoring Dimensions
+
+Critic evaluates each chapter across five dimensions, each scored 0-20:
+
+| Dimension | Focus |
 |:---|:---|
-| `novel init <path>` | 初始化小说项目目录 |
-| `novel write <file>` | 沉浸式 AI 续写循环 |
-| `novel auto <path>` | 四 Agent 全自动创作 |
-| `novel stash <text>` | 存入灵感潜意识池 |
-| `novel commit <file>` | 5 步审阅流程固化状态 |
-| `novel rollback <snapshot>` | 回滚到指定快照 |
-| `novel diff <file>` | 正文与 Shadow 一致性校验 |
-| `novel doctor <path>` | 世界线健康度诊断 |
+| Writing Quality | Sentence fluency, vocabulary, sensory detail |
+| Plot Logic | Causal coherence, pacing, payoff setup |
+| Character Consistency | Motivation, voice, emotional arc alignment |
+| Rhythm Control | Scene length variation, tension modulation |
+| Emotional Expression | Subtext, atmospheric resonance, reader impact |
 
-详细文档：`novel --help` 或查看 [CLAUDE.md](CLAUDE.md)。
+### Agent Autonomy (Mid-Write Tool Calling)
+
+When enabled, Writer can detect knowledge gaps during creation and autonomously query information sources. The protocol is transparent:
+
+1. Writer's prompt includes tool-calling instructions.
+2. If the LLM needs additional information, it emits a `##TOOL_CALL##` marker with the query.
+3. The system intercepts the marker, executes the query through ToolRegistry, injects results, and continues the generation loop.
+4. SafetyFence enforces recursion depth, token budget, and timeout constraints.
+
+This mechanism is controlled by the `safety_fence` configuration in `novel.yaml`.
+
+### Conditionals and Optimizations
+
+- **High-score bypass**: Chapters scoring >= 90 skip Manager real-time update, deferred to batch processing at pipeline end.
+- **Chapter type routing**: Climax chapters force Director analysis. Transition chapters skip Director. Routine chapters run Director every N chapters.
+- **Scheduling proposals**: Director can propose chapter insertions, skips, or merges, applied from end to start after current chapter completes.
+
+### Blind Mutation
+
+For chapters detected as climax or when prior score is below 80, Writer generates multiple structural variants through `think_variations()`:
+
+- **Exploratory mode**: Random dimension selection with varied temperature (0.5/0.7/0.9).
+- **Corrective mode**: Targets weak dimensions identified by Critic, injecting negative constraints into the variant prompt.
+- **Outline pre-screening**: Critic evaluates each variant outline on plot logic, character consistency, and pacing before full creation.
+
+### Example Output
+
+A five-chapter time-paradox short story generated by the autonomous pipeline:
+
+| Chapter | Title | Score | Words |
+|:---|:---|---:|---:|
+| ch_001 | Quantum Whisper | 85 | 6,064 |
+| ch_002 | Ripples | 85 | 4,110 |
+| ch_003 | Second Attempt | 85 | 5,694 |
+| ch_004 | Vortex | 82 | 4,306 |
+| ch_005 | Causal Loop | 85 | 5,746 |
+| **Total** | | **84.4 avg** | **25,920** |
+
+Creation time: approximately 14 minutes. Token consumption: 210,503.
 
 ---
 
-## MCP Server 集成
+## MCP Server and Claude Code Integration
 
-OpenNovel 提供 MCP (Model Context Protocol) Server，让 Claude Code 等 AI Agent 通过标准协议调用创作能力。
+OpenNovel exposes its full creation pipeline through the Model Context Protocol (MCP), enabling Claude Code and other MCP clients to initialize projects, check status, write chapters, and run autonomous creation.
 
-### 工具列表
+### Starting the MCP Server
 
-| Tool | 功能 | 输入 | 输出 |
-|:---|:---|:---|:---|
-| `init_project` | 初始化小说项目 | `path`: 项目路径 | 目录结构和模板文件 |
-| `get_status` | 读取项目状态 | `path`: 项目路径 | 配置、角色、章节、大纲信息 |
-| `write_chapter` | 单章创作 | `path`, `chapter_id`, `chapter_hint` | 章节正文 + 五维评分 + 维度详情 |
-| `auto_create` | 全自动创作 | `path`, `chapters?`: 章节数 | 完整小说 + 创作日志 |
+```bash
+# The server runs on stdio transport
+novel-mcp
+```
 
-### 配置方式
+### Registering with Claude Code
 
-在项目根目录或全局 Claude Code 配置中添加 `.mcp.json`：
+Create or edit `.mcp.json` in your project root or in `~/.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
-    "novel": {
+    "opennovel": {
       "command": "novel-mcp",
       "args": [],
-      "env": {}
+      "env": {
+        "DEEPSEEK_API_KEY": "sk-xxxx",
+        "OPENAI_API_KEY": "sk-xxxx"
+      }
     }
   }
 }
 ```
 
-### 使用场景
+### Available Tools
 
-在 Claude Code 中直接调用：
+| Tool | Description | Key Parameters |
+|:---|:---|:---|
+| `init_project` | Create a new novel project with standard structure | `path` (str): project directory |
+| `get_status` | Read project state: config, characters, chapters | `path` (str): project directory |
+| `write_chapter` | Single chapter creation with evaluation | `path`, `chapter_id`, `chapter_hint` (str) |
+| `auto_create` | Full multi-chapter autonomous creation | `path`, `chapters` (int, optional) |
+
+### Usage in Claude Code
+
+Once configured, you can invoke OpenNovel through natural language in Claude Code:
 
 ```
-# 初始化一个新小说项目
-请用 novel 初始化一个项目到 ./my-novel
+Initialize a science fiction novel project at ./nova.
 
-# 查看项目状态
-请查看 ./my-novel 的当前状态
+The setting is a generation ship where the crew discovers
+the cryo-pods are slowly failing. Create 3 characters:
+a pragmatic captain, a compassionate doctor, and a
+mysterious passenger who shouldn't be awake.
 
-# 全自动创作
-请用 novel 为 ./my-novel 自主创作 7 章
+Use auto_create to write 5 chapters.
+```
+
+Claude Code will call the MCP tools in sequence: `init_project` → edit files directly (canon, characters, outline) → `auto_create` with `chapters=5`.
+
+You can also combine with direct file editing for finer control:
+
+```
+After init_project, I'll write the world rules myself...
 ```
 
 ---
 
-## 架构
-
-```
-╔══════════════════════════════════╗
-║        Human Layer (创作层)       ║  ← 作者只写 Markdown
-╠══════════════════════════════════╣
-║       Machine Shadow (状态层)     ║  ← AI 自动提取状态
-╠══════════════════════════════════╣
-║      Semantic Layer (语义层)      ║  ← 向量检索记忆
-╚══════════════════════════════════╝
-```
-
-### 三层解耦
-
-| 层级 | 内容 | 技术 |
-|:---|:---|:---|
-| **Human Layer** | `canon/` `characters/` `draft/` 中的纯 Markdown | 任意文本编辑器 |
-| **Machine Shadow** | YAML Frontmatter + SQLite 事件账本 + Snapshots | `python-frontmatter` + `SQLModel` |
-| **Semantic Layer** | LlamaIndex + BGE-M3 向量索引 | `LlamaIndex` + `sentence-transformers` |
-
-### 设计原则
-
-- **ID 即锚点** — 全局 Canonical IDs（`char_001`、`loc_london`），严禁用角色名做关联
-- **权威分级** — `[CANON] > [STATE MEMORY] > [SUBCONSCIOUS]`，灵感不可作为设定执行
-- **人工审核关口** — AI 只能提议，人类拥有最终否决权
-- **操作可逆** — 破坏性写入前必须生成 Snapshot，支持 `novel rollback` 秒级恢复
-
-### 技术栈
-
-| 组件 | 技术 | 用途 |
-|:---|:---|:---|
-| CLI 框架 | `Typer` + `Rich` | 命令路由、终端富文本 |
-| LLM 总线 | `LiteLLM` + `tenacity` | 统一模型调用、重试容错 |
-| 检索引擎 | `LlamaIndex` | 文档解析、向量索引 |
-| 向量化 | `BGE-M3`（可选） | 本地语义检索 |
-| 数据校验 | `Pydantic V2` + `SQLModel` | 强类型状态校验 |
-| 状态账本 | `SQLite` | 因果事件日志 |
-| 文件解析 | `python-frontmatter` | Markdown/YAML 安全隔离 |
-| Token 控制 | `tiktoken` | 上下文预算熔断 |
-
----
-
-## 开发
+## CLI Command Reference
 
 ```bash
-git clone https://github.com/Yaemikoreal/OpenNovel.git
-cd OpenNovel
-
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-source .venv/bin/activate     # macOS / Linux
-
-pip install -e ".[dev]"
-
-# 测试
-pytest -v --tb=short
-pytest --cov=opennovel --cov-report=term-missing
-
-# 代码质量
-ruff check opennovel/ tests/
-ruff format --check opennovel/ tests/
-mypy opennovel/
+novel --help        # View all commands
+novel <command> --help  # Command-specific help
 ```
 
-### 项目结构
+| Command | Description |
+|:---|:---|
+| `novel init <name>` | Initialize project in workspace (`novels/<name>/`). Use `.` for current directory. |
+| `novel write <file>` | Interactive AI-assisted writing loop (Gen1 Actor). |
+| `novel auto <path>` | Four-agent autonomous creation pipeline (recommended). |
+| `novel stash <text>` | Store inspiration fragment into subconscious pool. `--tag` for labels. |
+| `novel commit <file>` | Five-step review: snapshot → state extraction → diff → confirmation → persist. |
+| `novel rollback <snapshot>` | Restore project to a previous snapshot. |
+| `novel diff <file>` | Validate consistency between chapter text and shadow state. |
+| `novel doctor <path>` | Diagnose project health: orphan characters, dangling references, dirty flags. |
+| `novel list` | List all projects in workspace with model, chapter count, word count. |
+| `novel config` | View or modify global configuration (default model, workspace directory). |
+
+---
+
+## Configuration
+
+### Project Configuration (`novel.yaml`)
+
+Each novel project has its own `novel.yaml`:
+
+```yaml
+version: "1.0.1"
+model: "deepseek/deepseek-v4-flash"
+token_budget: 32000
+output_reserve: 4000
+
+creative_direction: "Hard sci-fi, time paradox, tragic aesthetics"
+target_chapters: 5
+words_per_chapter: 3500
+outline: "outlines/story.md"
+director_enabled: true
+
+agents:
+  writer:
+    think_model: "deepseek/deepseek-v4-flash"
+    write_model: "deepseek/deepseek-v4-flash"
+    revise_model: "deepseek/deepseek-v4-flash"
+  critic:
+    model: "deepseek/deepseek-v4-flash"
+  manager:
+    model: "deepseek/deepseek-v4-flash"
+  director:
+    model: "deepseek/deepseek-v4-flash"
+```
+
+### Global Configuration (`.opennovel.yaml`)
+
+Located at the project root, searched upwards from current directory:
+
+```yaml
+# Global defaults for all projects
+default_model: "deepseek/deepseek-v4-flash"
+workspace_dir: "novels"
+default_api_base: "https://api.deepseek.com/v1"
+```
+
+### Model Resolution Chain
+
+```
+Agent-level (agents.writer.model)
+    → Project-level (novel.yaml model)
+        → Global-level (.opennovel.yaml default_model)
+            → Hardcoded default (deepseek/deepseek-v4-flash)
+```
+
+---
+
+## Architecture
+
+### Design Principles
+
+- **ID as Anchor** — Global canonical IDs (`char_001`, `loc_london`). Never use character names for internal references.
+- **Authority Hierarchy** — `CANON` > `STATE MEMORY` > `SUBCONSCIOUS`. Inspiration must never be executed as canon.
+- **Human Review Gate** — AI proposes, human approves. `novel commit` enforces diff review before persistence.
+- **Reversible Operations** — Every destructive write creates a file-level snapshot before modification. `novel rollback` for instant recovery.
+- **Independent Metrics Storage** — Runtime telemetry (token usage, evaluation history, agent traces) stored in `.novel.metrics.db`, physically separate from narrative truth (`.novel.db`).
+
+### Project Structure
+
+```
+<project>/
+├── canon/               # Immutable world-building (CANON layer)
+│   └── world_rules.md
+├── characters/          # Character files with YAML frontmatter
+│   ├── char_001.md
+│   └── char_002.md
+├── draft/               # Chapter drafts
+│   ├── ch_001.md
+│   ├── ch_002.md
+│   └── ...
+├── outlines/            # Story outline (##-separated chapters)
+│   └── story.md
+├── subconscious/        # Inspiration fragments (SUBCONSCIOUS layer)
+├── .snapshots/          # File-level incremental snapshots
+├── .index/              # Vector index persistence
+├── .novel.db            # SQLite event ledger (narrative truth)
+├── .novel.metrics.db    # SQLite metrics database (runtime telemetry)
+├── debug/prompts/       # Optional LLM prompt logs
+└── novel.yaml           # Project configuration
+```
+
+### Module Map
 
 ```
 opennovel/
-├── cli/                     # Typer CLI 命令入口
-│   ├── main.py              # novel 根命令
-│   ├── write.py             # novel write
-│   ├── auto.py              # novel auto (四 Agent 全自动)
-│   ├── commit.py            # novel commit & rollback
-│   └── stash.py             # novel stash
-├── core/                    # 核心引擎
-│   ├── llm.py               # LiteLLM 封装
-│   ├── auto_runner.py       # 四 Agent 编排器
-│   ├── context_assembler.py # 上下文组装 & Token 熔断
-│   ├── retriever.py         # 检索路由
-│   ├── state_manager.py     # 快照/回滚/Diff
-│   ├── config.py            # 项目配置管理
-│   └── parser.py            # Markdown/Frontmatter 解析
-├── agents/                  # 代理人格
-│   ├── actor.py             # Actor 沉浸式续写
-│   ├── auditor.py           # Auditor 状态提取
-│   ├── writer.py            # Writer (思考+创作+修改+变异)
-│   ├── critic.py            # Critic (五维评分+大纲评审+锚定反馈)
-│   ├── manager.py           # Manager (状态提取)
-│   └── director.py          # Director (全局叙事分析+策略指导)
-├── storage/                 # 存储适配
-│   ├── sqlite.py            # SQLite 事件账本
-│   ├── yaml_storage.py      # YAML Frontmatter 安全读写
-│   └── vector.py            # 向量索引
-├── schemas/                 # 数据模型
-│   ├── character.py         # 角色档案模型
-│   ├── event.py             # 事件账本模型
-│   ├── outline.py           # Writer 结构化大纲
-│   ├── evaluation.py        # Critic 评分模型 (含 AnchoredIssue)
-│   ├── outline_evaluation.py # 大纲三维评审模型
-│   ├── director.py          # Director 分析输出模型
-│   └── manager_update.py    # Manager 状态更新模型
-├── prompts/                 # Prompt 即资产
-│   ├── actor.v1.md          # Actor 人格 Prompt
-│   ├── auditor.v1.md        # Auditor 人格 Prompt
-│   ├── writer.v1.md         # Writer Agent Prompt
-│   ├── critic.v1.md         # Critic Agent Prompt
-│   ├── critic_outline.v1.md # Critic 大纲评审 Prompt
-│   ├── manager.v1.md        # Manager Agent Prompt
-│   └── director.v1.md       # Director Agent Prompt
-└── mcp_server.py            # MCP Server (Claude Code 集成)
+├── cli/                  # Typer CLI commands
+├── core/                 # Core engine
+│   ├── llm.py            # LiteLLM bus + tenacity retry + token tracking
+│   ├── auto_runner.py    # Autonomous four-agent orchestrator
+│   ├── context_assembler.py  # Context assembly + token budgeting
+│   ├── agent_autonomy.py # Tool-calling protocol + autonomous loop
+│   ├── hybrid_retriever.py  # SQL + vector dual-track retrieval
+│   ├── retriever.py      # Semantic retrieval routing
+│   ├── causal_graph.py   # NetworkX causal DAG analysis
+│   ├── canon_checker.py  # World-building rule validation
+│   ├── safety_fence.py   # Recursion/token/timeout/canon constraints
+│   ├── tool_registry.py  # Knowledge query dispatch center
+│   ├── mutation_strategy.py  # Mutation dimension selection
+│   ├── global_config.py  # .opennovel.yaml loader
+│   ├── state_manager.py  # Snapshot + rollback + diff
+│   ├── config.py         # novel.yaml management
+│   ├── doctor.py         # Project health diagnosis
+│   └── diff_checker.py   # Text-shadow consistency check
+├── agents/               # Agent personalities
+│   ├── writer.py         # Planning + creation + revision + mutation
+│   ├── critic.py         # Five-dimension scoring + anchored feedback
+│   ├── manager.py        # State extraction + event recording
+│   ├── director.py       # Global narrative analysis + strategy
+│   ├── actor.py          # Interactive writing (Gen1)
+│   └── auditor.py        # State extraction with self-correction
+├── storage/              # Storage adapters
+│   ├── sqlite.py         # Event store (SQLModel)
+│   ├── metrics.py        # Metrics store
+│   ├── yaml_storage.py   # YAML frontmatter atomic read/write
+│   └── vector.py         # LlamaIndex vector index
+├── schemas/              # Pydantic / SQLModel models
+├── prompts/              # Agent prompt assets
+└── mcp_server.py         # MCP protocol server
 ```
 
 ---
 
-## 贡献
+## Development
 
-欢迎各种形式的贡献。
+```bash
+# Setup
+git clone https://github.com/Yaemikoreal/OpenNovel.git
+cd OpenNovel
+pip install -e ".[dev]"
 
-1. 阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解开发流程
-2. 查看 [Issues](https://github.com/Yaemikoreal/OpenNovel/issues) 寻找想解决的问题
-3. 阅读 [CLAUDE.md](CLAUDE.md) 了解架构约定
-4. Fork 并提交 Pull Request
+# Optional dependencies
+pip install -e ".[local-embedding]"  # BGE-M3 local embeddings
+pip install -e ".[phase2]"           # NetworkX for causal graph
+
+# Testing
+pytest -v --tb=short                      # Run all tests
+pytest tests/test_auto_runner.py          # Single file
+pytest -k "test_autonomous"               # Filter by name
+pytest --cov=opennovel --cov-report=term-missing  # Coverage
+
+# Code quality
+ruff check opennovel/ tests/
+ruff format --check opennovel/ tests/
+mypy opennovel/
+
+# Type checking (strict)
+mypy --strict opennovel/
+```
+
+### Test Status
+
+- **817+ tests** across 39 test files
+- **88% code coverage**
+- Modules at or near 100% coverage: parser, state_manager, diff_checker, doctor, schemas, yaml_storage, metrics
 
 ---
 
-## 许可证
+## License
 
-本项目采用 [MIT 许可证](LICENSE)。
-请遵守 [行为准则](CODE_OF_CONDUCT.md) 参与社区交流。
+MIT License. See [LICENSE](LICENSE) for details.
