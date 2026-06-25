@@ -2,13 +2,16 @@
 
 负责：
 - 加载 novel.yaml 项目配置文件
-- 提供合理的默认值
+- 提供合理的默认值（三层 fallback：novel.yaml > GlobalConfig > 硬编码）
 - 类型安全的配置访问
 - per-agent LLM 配置覆盖
 
+三层模型路由（ADR 0006 — Agent 自治基础设施）：
+    novel.yaml agents.writer.model → novel.yaml model → .opennovel.yaml default_model → 硬编码
+
 使用方式:
     config = LoomConfig.load(project_root)
-    print(config.model)  # "gpt-4"
+    print(config.model)  # "deepseek/deepseek-v4-flash"（或 novel.yaml 的值）
     print(config.token_budget)  # 8000
 
     # 获取 Agent 专用 LLM 配置
@@ -21,10 +24,12 @@ from pathlib import Path
 
 import yaml
 
+from opennovel.core.global_config import DEFAULT_MODEL, GlobalConfig
+from opennovel.core.safety_fence import SafetyFenceConfig as _SafetyFenceConfig
+
 logger = logging.getLogger(__name__)
 
 # 默认配置值
-DEFAULT_MODEL = "gpt-4"
 DEFAULT_TOKEN_BUDGET = 8000
 DEFAULT_OUTPUT_RESERVE = 2000
 DEFAULT_VERSION = "1.0.1"
@@ -35,11 +40,18 @@ class AgentConfig:
     """单个 Agent 的 LLM 配置覆盖。
 
     未设置的字段继承 LoomConfig 的默认值。
+    支持 stage 级模型路由（ADR 0005 执行层成本优化器）：
+    - think_model: 思考阶段用便宜模型（如 gpt-4o-mini）
+    - write_model: 创作阶段用主力模型（如 gpt-4）
+    - revise_model: 修订阶段用主力模型（不设置则继承 model）
     """
 
     model: str | None = None
     api_base: str | None = None
     api_key: str | None = None
+    think_model: str | None = None
+    write_model: str | None = None
+    revise_model: str | None = None
 
 
 @dataclass
@@ -85,6 +97,9 @@ class LoomConfig:
     # Director 配置
     director_enabled: bool = True
 
+    # 安全围栏配置 (ADR 0006)
+    safety_fence: _SafetyFenceConfig = field(default_factory=_SafetyFenceConfig)
+
     extra: dict = field(default_factory=dict)
 
     @property
@@ -93,7 +108,10 @@ class LoomConfig:
         return self.token_budget - self.output_reserve
 
     def get_agent_llm_config(self, agent_name: str) -> dict[str, str | None]:
-        """获取指定 Agent 的 LLM 配置，未设置的字段继承默认值。
+        """获取指定 Agent 的 LLM 配置，三层 fallback。
+
+        fallback 链:
+            agents.{name}.model → self.model → GlobalConfig.default_model
 
         Args:
             agent_name: Agent 名称 ("writer", "critic", "manager")
@@ -115,28 +133,40 @@ class LoomConfig:
         }
 
     @classmethod
-    def load(cls, project_root: Path) -> "LoomConfig":
-        """从项目根目录加载配置。
+    def load(
+        cls,
+        project_root: Path,
+        global_cfg: "GlobalConfig | None" = None,
+    ) -> "LoomConfig":
+        """从项目根目录加载配置，支持三层 fallback。
 
-        如果 novel.yaml 不存在或读取失败，返回默认配置。
+        模型解析优先级：
+            novel.yaml agents.{name}.model
+            → novel.yaml model
+            → .opennovel.yaml default_model
+            → 硬编码默认值 (DEFAULT_MODEL)
 
         Args:
             project_root: 项目根目录路径
+            global_cfg: 全局配置实例（可选，未提供时自动加载）
 
         Returns:
             LoomConfig 实例
         """
+        if global_cfg is None:
+            global_cfg = GlobalConfig.load_from_project_root(project_root)
+
         config_path = project_root / "novel.yaml"
         if not config_path.exists():
             logger.info("配置文件不存在，使用默认配置: %s", config_path)
-            return cls()
+            return cls(model=global_cfg.default_model)
 
         try:
             with open(config_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
         except Exception as e:
             logger.warning("配置文件读取失败，使用默认配置: %s", e)
-            return cls()
+            return cls(model=global_cfg.default_model)
 
         # 解析 per-agent 配置
         agents_data = data.get("agents", {})
@@ -162,12 +192,18 @@ class LoomConfig:
         }
         extra = {k: v for k, v in data.items() if k not in known_keys}
 
+        # 三层 fallback 解析 model
+        model = data.get("model") or global_cfg.default_model
+
+        # 三层 fallback 解析 api_base
+        api_base = data.get("api_base") or global_cfg.default_api_base
+
         return cls(
             version=str(data.get("version", DEFAULT_VERSION)),
-            model=str(data.get("model", DEFAULT_MODEL)),
+            model=str(model),
             token_budget=int(data.get("token_budget", DEFAULT_TOKEN_BUDGET)),
             output_reserve=int(data.get("output_reserve", DEFAULT_OUTPUT_RESERVE)),
-            api_base=data.get("api_base"),
+            api_base=api_base,
             api_key=data.get("api_key"),
             creative_direction=str(data.get("creative_direction", "")),
             target_chapters=int(data.get("target_chapters", 5)),
@@ -224,6 +260,12 @@ class LoomConfig:
                 agent_data["api_base"] = cfg.api_base
             if cfg.api_key:
                 agent_data["api_key"] = cfg.api_key
+            if cfg.think_model:
+                agent_data["think_model"] = cfg.think_model
+            if cfg.write_model:
+                agent_data["write_model"] = cfg.write_model
+            if cfg.revise_model:
+                agent_data["revise_model"] = cfg.revise_model
             if agent_data:
                 agents[name] = agent_data
         if agents:
@@ -254,4 +296,7 @@ def _parse_agent_config(data: dict) -> AgentConfig:
         model=data.get("model"),
         api_base=data.get("api_base"),
         api_key=data.get("api_key"),
+        think_model=data.get("think_model"),
+        write_model=data.get("write_model"),
+        revise_model=data.get("revise_model"),
     )

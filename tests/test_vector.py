@@ -257,3 +257,68 @@ class TestDeleteDocument:
 
         mock_index.delete_ref_doc.assert_called_once_with("doc_001")
         mock_index.storage_context.persist.assert_called_once()
+
+
+class TestEnsureIndex:
+    """VectorStore.ensure_index 自动加载/构建测试。"""
+
+    def test_returns_true_when_index_already_loaded(self, tmp_path: Path) -> None:
+        """测试索引已加载时直接返回 True。"""
+        store = VectorStore(tmp_path)
+        store._index = MagicMock()
+        assert store.ensure_index() is True
+
+    def test_loads_existing_index(self, tmp_path: Path) -> None:
+        """测试加载已有持久化索引。"""
+        index_dir = tmp_path / ".index"
+        index_dir.mkdir(parents=True, exist_ok=True)
+
+        store = VectorStore(tmp_path, index_dir=index_dir)
+        # 索引目录存在但未初始化 _index
+        # ensure_index 会尝试 load_index → load_index 会检查 index_dir.exists()
+        # 由于没有实际索引数据，load_index 会失败
+        # 然后 ensure_index 会尝试 build_index，但没有源文档目录
+        # 所以最终返回 False — 这是预期行为
+        result = store.ensure_index()
+        # 我们只验证它不会崩溃，结果取决于底层条件
+        assert isinstance(result, bool)
+
+    @patch("opennovel.storage.vector.VectorStore.load_index")
+    def test_builds_when_no_index(self, mock_load: MagicMock, tmp_path: Path) -> None:
+        """测试无持久化索引时从源目录构建。"""
+        mock_load.return_value = False  # 加载失败
+
+        store = VectorStore(tmp_path)
+        store.build_index = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+        # 创建源目录
+        src_dir = tmp_path / "docs"
+        src_dir.mkdir()
+
+        result = store.ensure_index(src_dir)
+        store.build_index.assert_called_once_with(src_dir)  # type: ignore[attr-defined]
+
+    @patch("opennovel.storage.vector.VectorStore.load_index")
+    def test_returns_false_when_no_source(self, mock_load: MagicMock, tmp_path: Path) -> None:
+        """测试无索引且无源目录时返回 False。"""
+        mock_load.return_value = False
+
+        store = VectorStore(tmp_path)
+        # 不传 documents_dir
+        result = store.ensure_index()
+        assert result is False
+
+    @patch("opennovel.storage.vector.VectorStore.load_index")
+    def test_ensure_then_add_document(self, mock_load: MagicMock, tmp_path: Path) -> None:
+        """测试 ensure_index 后 add_document 正常工作。"""
+        mock_load.return_value = False  # 加载失败
+
+        store = VectorStore(tmp_path)
+        src_dir = tmp_path / "docs"
+        src_dir.mkdir()
+        # mock build_index 以设置 _index
+        store._index = MagicMock()
+
+        assert store.ensure_index(src_dir) is True
+        store.add_document("测试文本")
+        store._index.insert.assert_called_once()

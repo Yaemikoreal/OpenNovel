@@ -108,6 +108,7 @@ class Retriever:
         """向潜意识池添加新的灵感碎片，并触发增量索引更新。
 
         同时写入 subconscious/lines.md 文件和向量索引。
+        如果索引未初始化，自动从 subconscious/ 目录构建。
 
         Args:
             text: 灵感文本
@@ -123,6 +124,9 @@ class Retriever:
 
         with open(lines_file, "a", encoding="utf-8") as f:
             f.write(entry)
+
+        # 确保索引可用（自动加载或构建）
+        self._subconscious_store.ensure_index(sub_dir)
 
         # 增量添加到向量索引
         metadata = {"source": "subconscious", "tags": tags or []}

@@ -29,6 +29,12 @@
 - 是否有重试次数异常（说明 Writer 创作困难）
 - 是否有一致性校验问题累积
 
+### 5. 章节调度评估
+- 当前大纲章节是否合理，是否有需要补充过渡/高潮章节
+- 是否有章节内容密度不足，需要合并
+- 是否有章节因前文已覆盖而可以跳过
+- 张力曲线平坦时考虑插入补充章节，压力堆积过高时考虑插入缓冲章节
+
 ## 输出规则
 
 1. **战略性而非战术性**: 你关注的是"接下来应该往哪个方向走"，而不是"这一段应该怎么写"
@@ -50,7 +56,34 @@
   },
   "strategic_guidance": "下一章应放缓节奏，安排角色内心独白，为后续高潮蓄力。",
   "creative_direction_adjustment": "增加角色间的对话场景，减少外部冲突。",
-  "warnings": []
+  "warnings": [],
+  "scheduling_proposals": []
+}
+```
+
+当需要提议大纲调整时，填充 scheduling_proposals 字段：
+
+```json
+{
+  "scheduling_proposals": [
+    {
+      "action": "insert",
+      "target_chapter_id": "ch_003",
+      "rationale": "连续两章叙述推进过快，需要在 ch_003 前插入一章角色内心独白来调节节奏",
+      "new_chapter_hint": "## 补充章节：内心的风暴\n\n主角在决战前夜独自反思，回忆过去的抉择，为最终决定积蓄力量。"
+    },
+    {
+      "action": "skip",
+      "target_chapter_id": "ch_005",
+      "rationale": "ch_005 的日常内容已经在 ch_004 的结尾处覆盖，跳过可避免重复"
+    },
+    {
+      "action": "merge",
+      "target_chapter_id": "ch_006",
+      "rationale": "ch_006 和 ch_007 的内容密度都不足独立成章，合并为一章更紧凑",
+      "merge_with": "ch_007"
+    }
+  ]
 }
 ```
 

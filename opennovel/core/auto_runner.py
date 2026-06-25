@@ -7,6 +7,7 @@
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 
 from rich.console import Console
@@ -20,7 +21,10 @@ from opennovel.core.diff_checker import DiffChecker, Mismatch
 from opennovel.core.hybrid_retriever import HybridRetriever
 from opennovel.core.llm import LLMBus
 from opennovel.core.retriever import Retriever
+from opennovel.core.safety_fence import SafetyFence
 from opennovel.core.state_manager import StateManager
+from opennovel.core.tool_registry import ToolRegistry
+from opennovel.schemas.director import SchedulingAction, SchedulingProposal
 from opennovel.schemas.evaluation import ChapterEvaluation
 from opennovel.schemas.outline import ChapterOutline
 from opennovel.storage.metrics import MetricsStore
@@ -29,8 +33,155 @@ from opennovel.storage.yaml_storage import YAMLStorage
 logger = logging.getLogger(__name__)
 
 MAX_CHAPTER_RETRIES = 5
+MANAGER_BATCH_THRESHOLD = 90  # 评分 >= 90 时跳过 Manager 实时更新，改为批处理
+DIRECTOR_INTERVAL = 3  # 日常章节每 N 章运行一次 Director
 
 console = Console()
+
+
+class ChapterType(str, Enum):
+    """章节类型枚举，用于调度器路由决策。"""
+
+    CLIMAX = "climax"  # 高潮/转折/决战
+    TRANSITION = "transition"  # 过渡/日常/平静
+    ROUTINE = "routine"  # 普通推进
+
+
+def detect_chapter_type(chapter_hint: str) -> ChapterType:
+    """根据大纲提示检测章节类型。
+
+    高潮关键词触发 CLIMAX 类型，过渡关键词触发 TRANSITION 类型，
+    否则为 ROUTINE 类型。
+
+    Args:
+        chapter_hint: 大纲中本章的描述文本
+
+    Returns:
+        章节类型枚举
+    """
+    hint_lower = chapter_hint.lower()
+
+    climax_keywords = ["转折", "高潮", "climax", "决战", "大结局", "finale", "对决"]
+    if any(kw in hint_lower for kw in climax_keywords):
+        return ChapterType.CLIMAX
+
+    transition_keywords = ["过渡", "日常", "平静", "transition", "日常篇", "休整"]
+    if any(kw in hint_lower for kw in transition_keywords):
+        return ChapterType.TRANSITION
+
+    return ChapterType.ROUTINE
+
+
+def should_skip_manager(evaluation: ChapterEvaluation) -> bool:
+    """判断是否跳过 Manager 实时更新。
+
+    评分 >= MANAGER_BATCH_THRESHOLD 且无锚定问题时，
+    将 Manager 更新推迟到批处理阶段。
+
+    Args:
+        evaluation: Critic 评审结果
+
+    Returns:
+        True 表示跳过，延后批处理
+    """
+    return evaluation.total_score >= MANAGER_BATCH_THRESHOLD and not evaluation.has_anchored_issues
+
+
+def should_skip_director(
+    chapter_type: ChapterType,
+    chapter_index: int,
+    total_chapters: int,
+) -> bool:
+    """判断是否跳过 Director 分析。
+
+    高潮章节强制运行，过渡章节跳过，日常章节每 N 章运行一次。
+
+    Args:
+        chapter_type: 章节类型
+        chapter_index: 当前章节索引（0-based）
+        total_chapters: 总章节数
+
+    Returns:
+        True 表示跳过 Director
+    """
+    # 最后一章不运行 Director（没有下一章需要指导）
+    if chapter_index >= total_chapters - 1:
+        return True
+
+    # 高潮章节：强制运行
+    if chapter_type == ChapterType.CLIMAX:
+        return False
+
+    # 过渡章节：跳过
+    if chapter_type == ChapterType.TRANSITION:
+        return True
+
+    # 日常章节：每 N 章运行一次（第 0 章、第 N 章...）
+    return chapter_index % DIRECTOR_INTERVAL != 0
+
+
+def parse_outline_from_text(outline_text: str) -> list[tuple[str, str]]:
+    """解析大纲文本，返回 [(chapter_id, chapter_hint), ...] 列表。
+
+    不依赖 AutoRunner 实例，供 CLI dry-run 模式直接使用。
+
+    Args:
+        outline_text: Markdown 格式的大纲文本
+
+    Returns:
+        [(chapter_id, chapter_hint), ...]
+    """
+    chapters = []
+    current_title = None
+    current_lines = []
+
+    for line in outline_text.split("\n"):
+        if line.startswith("## "):
+            if current_title is not None:
+                chapters.append((current_title, "\n".join(current_lines).strip()))
+            current_title = line[3:].strip()
+            current_lines = []
+        else:
+            current_lines.append(line)
+
+    if current_title is not None:
+        chapters.append((current_title, "\n".join(current_lines).strip()))
+
+    result: list[tuple[str, str]] = []
+    for i, (title, hint) in enumerate(chapters, 1):
+        chapter_id = f"ch_{i:03d}"
+        result.append((chapter_id, f"{title}\n{hint}"))
+
+    return result
+
+
+class _OutlineWithKnowledge:
+    """将补充知识注入 outline 的临时包装类。
+
+    Args:
+        base: 原始 ChapterOutline
+        extra: 补充知识文本
+    """
+
+    def __init__(self, base: ChapterOutline, extra: str) -> None:
+        self.chapter_id = base.chapter_id
+        self.title = base.title
+        self.summary = f"{base.summary}\n\n{extra}"
+        self.scenes = base.scenes
+        self.character_arcs = base.character_arcs
+        self.key_plot_points = base.key_plot_points
+        self.narrative_rhythm = base.narrative_rhythm
+        self.target_words = base.target_words
+
+
+@dataclass
+class DeferredManagerData:
+    """延后的 Manager 更新数据，用于批处理。"""
+
+    chapter_id: str
+    chapter_text: str
+    active_characters: list[str]
+    chapter_type: ChapterType
 
 
 @dataclass
@@ -45,6 +196,7 @@ class ChapterResult:
     manager_summary: str = ""
     word_count: int = 0
     mismatches: list[Mismatch] = field(default_factory=list)
+    manager_skipped: bool = False  # True 表示本次 Manager 更新被延后批处理
 
 
 @dataclass
@@ -59,6 +211,63 @@ class RunReport:
     end_time: str = ""
     log_lines: list[str] = field(default_factory=list)
     all_mismatches: list[Mismatch] = field(default_factory=list)
+
+
+def _proposal_sort_key(
+    proposal: SchedulingProposal,
+    chapters: list[tuple[str, str]],
+) -> int:
+    """生成提议的排序键，用于从后往前应用。
+
+    Args:
+        proposal: 调度提议
+        chapters: 当前章节列表
+
+    Returns:
+        目标章节在列表中的索引，找不到时返回 -1
+    """
+    for i, (cid, _) in enumerate(chapters):
+        if cid == proposal.target_chapter_id:
+            return i
+    return -1
+
+
+def _proposal_affects_future(
+    proposal: SchedulingProposal,
+    chapters: list[tuple[str, str]],
+    current_index: int,
+) -> bool:
+    """判断提议是否影响未完成的章节。
+
+    Args:
+        proposal: 调度提议
+        chapters: 当前章节列表
+        current_index: 当前已完成的章节索引
+
+    Returns:
+        True 表示提议作用于未完成的章节
+    """
+    return _proposal_sort_key(proposal, chapters) > current_index
+
+
+def _generate_new_chapter_id(existing_ids: set[str]) -> str:
+    """生成新的不重复章节 ID。
+
+    Args:
+        existing_ids: 现有章节 ID 集合
+
+    Returns:
+        新的章节 ID，如 ch_008
+    """
+    max_num = 0
+    for cid in existing_ids:
+        if cid.startswith("ch_"):
+            try:
+                num = int(cid[3:])
+                max_num = max(max_num, num)
+            except ValueError:
+                continue
+    return f"ch_{max_num + 1:03d}"
 
 
 class AutoRunner:
@@ -78,6 +287,11 @@ class AutoRunner:
         # 指标数据库（Phase 2.2）
         metrics_path = project_root / ".novel.metrics.db"
         self.metrics = MetricsStore(metrics_path)
+
+        # 安全围栏（ADR 0006 — Agent 自治约束边界）
+        self.safety_fence = SafetyFence(config.safety_fence)
+        if not config.safety_fence.enabled:
+            logger.info("安全围栏已禁用")
 
         # Prompt 日志目录
         prompt_log_dir = project_root / "debug" / "prompts"
@@ -131,6 +345,14 @@ class AutoRunner:
             retriever=retriever,
         )
 
+        # 工具注册中心（Agent 自治 — 知识缺口检索，需在 Writer 之前创建）
+        self.tool_registry = ToolRegistry(
+            project_root=project_root,
+            retriever=retriever,
+            event_store=event_store,
+            storage=self.storage,
+        )
+
         self.writer = Writer(
             llm_bus=self.writer_bus,
             retriever=retriever,
@@ -139,6 +361,11 @@ class AutoRunner:
             words_per_chapter=config.words_per_chapter,
             event_store=event_store,
             hybrid_retriever=hybrid,
+            think_model=config.agent_writer.think_model,
+            write_model=config.agent_writer.write_model,
+            revise_model=config.agent_writer.revise_model,
+            tool_registry=self.tool_registry,
+            safety_fence=self.safety_fence,
         )
         self.critic = Critic(
             llm_bus=self.critic_bus,
@@ -172,6 +399,9 @@ class AutoRunner:
                 project_root=project_root,
                 event_store=event_store,
             )
+
+        # 条件管线：延后批处理的 Manager 更新队列
+        self._deferred_manager_updates: list[DeferredManagerData] = []
 
     def _build_or_load_indexes(self, retriever: Retriever) -> None:
         """构建或加载向量索引（canon + subconscious）。
@@ -217,31 +447,204 @@ class AutoRunner:
         style = style_map.get(level, "dim")
         console.print(f"  [{style}]{log_line}[/{style}]")
 
-    def _parse_outline(self, outline_text: str) -> list[tuple[str, str]]:
-        """解析大纲文本，返回 [(chapter_id, chapter_hint), ...] 列表。"""
-        chapters = []
-        current_title = None
-        current_lines = []
+    def _check_safety(self, agent: str, additional_tokens: int = 0) -> bool:
+        """执行安全围栏检查，失败时记录日志。
 
-        for line in outline_text.split("\n"):
-            if line.startswith("## "):
-                if current_title is not None:
-                    chapters.append((current_title, "\n".join(current_lines).strip()))
-                current_title = line[3:].strip()
-                current_lines = []
+        封装 SafetyFence.check_all()，添加 AutoRunner 级别的日志输出。
+
+        Args:
+            agent: Agent 名称
+            additional_tokens: 预计消耗的 Token 数
+
+        Returns:
+            True 表示通过
+        """
+        if not self.safety_fence.check_all(agent, additional_tokens):
+            violations = self.safety_fence.violations
+            if violations:
+                last = violations[-1]
+                self._log(
+                    f"安全围栏: [{last.rule}] {last.detail}",
+                    "warning",
+                )
+            return False
+        return True
+
+    def _process_deferred_manager_updates(self, results: list[ChapterResult]) -> None:
+        """批处理延后的 Manager 更新。
+
+        对所有因高分跳过实时 Manager 的章节执行批量状态提取，
+        并将提取结果回填到对应的 ChapterResult。
+
+        Args:
+            results: 已完成的所有章节结果列表
+        """
+        if not self._deferred_manager_updates:
+            return
+
+        console.print(
+            f"\n[bold cyan]📦 批处理 Manager 更新[/bold cyan] "
+            f"({len(self._deferred_manager_updates)} 章延后)"
+        )
+        self._log(
+            f"开始批处理 {len(self._deferred_manager_updates)} 个延后的 Manager 更新",
+            "info",
+        )
+
+        for deferred in self._deferred_manager_updates:
+            try:
+                with self.metrics.trace("manager", "batch_update", deferred.chapter_id):
+                    manager_result = self.manager.update(
+                        deferred.chapter_id,
+                        deferred.chapter_text,
+                        deferred.active_characters,
+                    )
+                    # 回填结果到 ChapterResult
+                    for r in results:
+                        if r.chapter_id == deferred.chapter_id:
+                            r.manager_summary = manager_result.chapter_summary
+                            r.manager_skipped = False
+                            break
+                    self._log(
+                        f"  {deferred.chapter_id}: "
+                        f"{len(manager_result.character_updates)} 个角色变更, "
+                        f"{len(manager_result.events)} 个事件",
+                        "success",
+                    )
+            except Exception as e:
+                self._log(f"  {deferred.chapter_id} Manager 批处理失败: {e}", "error")
+
+        # 清空队列
+        self._deferred_manager_updates.clear()
+        self._log("批处理完成", "success")
+
+    def _apply_scheduling_proposals(
+        self,
+        chapters: list[tuple[str, str]],
+        proposals: list[SchedulingProposal],
+        current_index: int,
+    ) -> list[tuple[str, str]]:
+        """处理 Director 的章节调度提议，修改剩余章节列表。
+
+        支持的调度动作（按优先级）：
+        1. SKIP — 跳过无必要的章节
+        2. INSERT — 在指定位置前插入补充章节
+        3. MERGE — 合并内容稀疏的章节
+
+        Args:
+            chapters: 当前完整章节列表（含已完成部分）
+            proposals: Director 输出的调度提议列表
+            current_index: 当前已完成的章节索引（0-based）
+
+        Returns:
+            修改后的章节列表，已完成的章节不受影响
+        """
+        if not proposals:
+            return chapters
+
+        result = list(chapters)
+        # 从后往前应用提案，避免索引偏移
+        sorted_proposals = sorted(
+            proposals, key=lambda p: _proposal_sort_key(p, result), reverse=True
+        )
+        # 只保留影响剩余章节的提议
+        sorted_proposals = [
+            p for p in sorted_proposals if _proposal_affects_future(p, result, current_index)
+        ]
+
+        if not sorted_proposals:
+            return result
+
+        total_before = len(result)
+        for proposal in sorted_proposals:
+            if proposal.action == SchedulingAction.SKIP:
+                result = self._apply_skip_proposal(result, proposal)
+            elif proposal.action == SchedulingAction.INSERT:
+                result = self._apply_insert_proposal(result, proposal, current_index)
+            elif proposal.action == SchedulingAction.MERGE:
+                self._log(
+                    f"调度提议: 合并 {proposal.target_chapter_id} ↔ {proposal.merge_with} "
+                    f"— {proposal.rationale}",
+                    "info",
+                )
+                # MERGE 暂未实现，仅记录日志
             else:
-                current_lines.append(line)
+                self._log(f"未知调度动作: {proposal.action}", "warning")
 
-        if current_title is not None:
-            chapters.append((current_title, "\n".join(current_lines).strip()))
-
-        # 生成 chapter_id
-        result = []
-        for i, (title, hint) in enumerate(chapters, 1):
-            chapter_id = f"ch_{i:03d}"
-            result.append((chapter_id, f"{title}\n{hint}"))
+        changes = total_before - len(result)
+        if changes:
+            self._log(
+                f"调度执行: {changes} 处大纲调整",
+                "success",
+            )
 
         return result
+
+    def _apply_skip_proposal(
+        self,
+        chapters: list[tuple[str, str]],
+        proposal: SchedulingProposal,
+    ) -> list[tuple[str, str]]:
+        """执行 SKIP 调度：从章节列表中移除目标章节。
+
+        Args:
+            chapters: 当前章节列表
+            proposal: 调度提议
+
+        Returns:
+            移除目标章节后的列表
+        """
+        target = proposal.target_chapter_id
+        idx = next((i for i, (cid, _) in enumerate(chapters) if cid == target), -1)
+        if idx == -1:
+            self._log(f"调度跳过失败: 未找到章节 {target}", "warning")
+            return chapters
+
+        self._log(
+            f"调度执行: 跳过 {target} — {proposal.rationale}",
+            "success",
+        )
+        return chapters[:idx] + chapters[idx + 1 :]
+
+    def _apply_insert_proposal(
+        self,
+        chapters: list[tuple[str, str]],
+        proposal: SchedulingProposal,
+        current_index: int,
+    ) -> list[tuple[str, str]]:
+        """执行 INSERT 调度：在目标章节前插入补充章节。
+
+        Args:
+            chapters: 当前章节列表
+            proposal: 调度提议
+            current_index: 当前已完成章节索引
+
+        Returns:
+            插入补充章节后的列表
+        """
+        if not proposal.new_chapter_hint:
+            self._log("调度插入失败: 补充章节大纲为空", "warning")
+            return chapters
+
+        target = proposal.target_chapter_id
+        idx = next((i for i, (cid, _) in enumerate(chapters) if cid == target), -1)
+        if idx == -1:
+            self._log(f"调度插入失败: 未找到目标章节 {target}", "warning")
+            return chapters
+
+        # 生成新章节 ID
+        existing_ids = {cid for cid, _ in chapters}
+        new_id = _generate_new_chapter_id(existing_ids)
+
+        self._log(
+            f"调度执行: 在 {target} 前插入 {new_id} — {proposal.rationale}",
+            "success",
+        )
+        return chapters[:idx] + [(new_id, proposal.new_chapter_hint)] + chapters[idx:]
+
+    def _parse_outline(self, outline_text: str) -> list[tuple[str, str]]:
+        """解析大纲文本，返回 [(chapter_id, chapter_hint), ...] 列表。"""
+        return parse_outline_from_text(outline_text)
 
     def _get_previous_summary(self, chapter_index: int, results: list[ChapterResult]) -> str:
         """获取前一章的摘要。"""
@@ -382,15 +785,58 @@ class AutoRunner:
             "success",
         )
 
+        # Step 1.5: 知识缺口检测（Agent 自治 — 主动检索）
+        additional_knowledge = ""
+        if hasattr(self, "tool_registry") and hasattr(self.writer, "detect_knowledge_gaps"):
+            needs = self.writer.detect_knowledge_gaps(outline, previous_text)
+            if needs:
+                self._log(
+                    f"知识缺口检测: 发现 {len(needs)} 个需要补充的信息",
+                    "info",
+                )
+                results = self.tool_registry.fulfill(needs)
+                filled = [r for r in results if r.content and r.relevance > 0]
+                if filled:
+                    additional_knowledge = self.writer.format_knowledge_results(filled)
+                    self._log(
+                        f"主动检索: {len(filled)}/{len(needs)} 个缺口已补充",
+                        "success",
+                    )
+                else:
+                    self._log(
+                        f"主动检索: 未找到补充信息（{len(needs)} 个缺口）",
+                        "info",
+                    )
+
         # Step 2-3: 创作 → 评分循环
         best_text = ""
         best_evaluation = None
         retry_count = 0
 
-        # 首次创作
+        # 首次创作（注入主动检索的补充信息）
         console.print(f"[bold]✍️  Writer 创作[/bold] {chapter_id}")
         with self.metrics.trace("writer", "write", chapter_id):
-            chapter_text = self.writer.write(chapter_id, outline, previous_text)
+            # Agent 自治模式：开启 mid-write 工具调用
+            if self.config.safety_fence.enabled and self.tool_registry is not None:
+                self._log("Agent 自治模式: 支持创作中主动查询", "info")
+                # 将补充信息注入 outline 的 summary
+                if additional_knowledge:
+                    enhanced = _OutlineWithKnowledge(outline, additional_knowledge)
+                    chapter_text = self.writer.write_with_autonomy(
+                        chapter_id, enhanced, previous_text,
+                    )
+                else:
+                    chapter_text = self.writer.write_with_autonomy(
+                        chapter_id, outline, previous_text,
+                    )
+            else:
+                # 传统模式：无 mid-write 工具调用
+                chapter_text = self.writer.write(
+                    chapter_id,
+                    outline,
+                    previous_text,
+                    additional_knowledge=additional_knowledge,
+                )
         word_count = len(chapter_text)
         self._log(f"Writer 创作完成: {word_count} 字", "success")
 
@@ -434,7 +880,43 @@ class AutoRunner:
                 retry_count = attempt
                 break
 
-            # Writer 修订（优先使用锚定反馈）
+            # Writer 修订（局部热修复优先 → 全章 revise 回退）
+            console.print(
+                f"[bold yellow]↩️  退回 Writer 修订[/bold yellow] (第 {attempt + 1} 次重试)"
+            )
+            self._log(f"不合格 ({evaluation.total_score} 分)，退回修订", "warning")
+
+            if evaluation.has_anchored_issues and hasattr(self.writer, "hot_fix"):
+                # 优先局部热修复（ADR 0006 — Agent 自治）
+                # 安全围栏检查：hot_fix 是自治调用，约束递归深度和 Token
+                if self._check_safety("writer", additional_tokens=2000):
+                    anchored_data = [a.model_dump() for a in evaluation.anchored_issues]
+                    console.print(f"[bold]🔧 局部热修复[/bold] ({len(anchored_data)} 个问题)")
+                    with (
+                        self.safety_fence.autonomous_call("writer", max_tokens=2000),
+                        self.metrics.trace("writer", "hot_fix", chapter_id),
+                    ):
+                        hot_fixed = self.writer.hot_fix(
+                            chapter_id,
+                            outline,
+                            chapter_text,
+                            anchored_data,
+                        )
+                    if hot_fixed is not None:
+                        chapter_text = hot_fixed
+                        self._log(
+                            f"局部热修复完成: {len(chapter_text)} 字",
+                            "success",
+                        )
+                        self.safety_fence.record_tokens(2000)
+                        continue  # 直接进入下一轮评估
+
+                    # hot_fix 失败，回退到全章 revise
+                    self._log("局部热修复失败（无法定位原文），回退到全章修订", "warning")
+                else:
+                    self._log("安全围栏阻断 hot_fix，回退到全章修订", "warning")
+
+            # 全章 revise
             if evaluation.has_anchored_issues:
                 parts = []
                 for issue in evaluation.anchored_issues:
@@ -450,11 +932,6 @@ class AutoRunner:
                 suggestions_text = "\n".join(f"- {s}" for s in evaluation.suggestions)
                 feedback = f"不合格原因:\n{issues_text}\n\n改进建议:\n{suggestions_text}"
 
-            console.print(
-                f"[bold yellow]↩️  退回 Writer 修订[/bold yellow] (第 {attempt + 1} 次重试)"
-            )
-            self._log(f"不合格 ({evaluation.total_score} 分)，退回修订", "warning")
-
             with self.metrics.trace("writer", "revise", chapter_id):
                 chapter_text = self.writer.revise(chapter_id, outline, chapter_text, feedback)
             self._log(f"Writer 修订完成: {len(chapter_text)} 字", "success")
@@ -464,23 +941,49 @@ class AutoRunner:
 
         # 使用最高分版本的字数（而非最后一次修订的字数）
         word_count = len(best_text)
-
-        # Step 4: Manager 更新
-        console.print(f"[bold]🔄 Manager 更新状态[/bold] {chapter_id}")
         active_chars = self._get_active_characters()
-        manager_result = None
-        try:
-            with self.metrics.trace("manager", "update", chapter_id):
-                manager_result = self.manager.update(chapter_id, best_text, active_chars)
+        chapter_type = detect_chapter_type(chapter_hint)
+
+        # Step 4-5: 条件管线分支
+        # 条件跳转（Conditional Jump）— ADR 0006:
+        #   评分 >= 90 → 跳过 Manager 实时更新，延后批处理
+        if should_skip_manager(best_evaluation):
             self._log(
-                f"Manager 更新: {len(manager_result.character_updates)} 个角色变更, "
-                f"{len(manager_result.events)} 个事件",
-                "success",
+                f"条件跳转: 评分 {best_evaluation.total_score} >= {MANAGER_BATCH_THRESHOLD}，"
+                f"跳过 Manager 实时更新（延后批处理）",
+                "info",
             )
-            manager_summary = manager_result.chapter_summary
-        except Exception as e:
-            self._log(f"Manager 更新失败: {e}", "error")
+            manager_skipped = True
             manager_summary = ""
+            event_ids: list[str] = []
+
+            # 记录延后批处理数据
+            self._deferred_manager_updates.append(
+                DeferredManagerData(
+                    chapter_id=chapter_id,
+                    chapter_text=best_text,
+                    active_characters=active_chars,
+                    chapter_type=chapter_type,
+                )
+            )
+        else:
+            manager_skipped = False
+            console.print(f"[bold]🔄 Manager 更新状态[/bold] {chapter_id}")
+            manager_result = None
+            try:
+                with self.metrics.trace("manager", "update", chapter_id):
+                    manager_result = self.manager.update(chapter_id, best_text, active_chars)
+                self._log(
+                    f"Manager 更新: {len(manager_result.character_updates)} 个角色变更, "
+                    f"{len(manager_result.events)} 个事件",
+                    "success",
+                )
+                manager_summary = manager_result.chapter_summary
+                event_ids = [e.event_id for e in manager_result.events] if manager_result else []
+            except Exception as e:
+                self._log(f"Manager 更新失败: {e}", "error")
+                manager_summary = ""
+                event_ids = []
 
         # Step 5: 快照 + 写入 + 一致性校验
         chapter_path = self.project_root / "draft" / f"{chapter_id}.md"
@@ -510,8 +1013,7 @@ class AutoRunner:
         self.storage.write_markdown_file(chapter_path, chapter_meta, best_text)
         self._log(f"章节已写入: {chapter_path}", "success")
 
-        # 完成快照（记录 fm_after + 事件 ID）
-        event_ids = [e.event_id for e in manager_result.events] if manager_result else []
+        # 完成快照
         self.state_manager.update_snapshot_after(
             snapshot.snapshot_id,
             affected_files,
@@ -535,6 +1037,7 @@ class AutoRunner:
             manager_summary=manager_summary,
             word_count=word_count,
             mismatches=chapter_mismatches,
+            manager_skipped=manager_skipped,
         )
 
     def run(self, outline_text: str) -> RunReport:
@@ -572,6 +1075,7 @@ class AutoRunner:
 
             previous_summary = self._get_previous_summary(i, results)
             previous_text = self._get_previous_chapter_text(i, results)
+            chapter_type = detect_chapter_type(chapter_hint)
 
             try:
                 result = self.run_chapter(
@@ -584,12 +1088,27 @@ class AutoRunner:
                 results.append(result)
                 report.successful_chapters += 1
 
-                # Director 全局分析（每章结束后，非最后一章时执行）
-                if self.director and i < len(chapters) - 1:
+                # Director 全局分析 — 条件路由（ADR 0006）
+                #   高潮章节: 强制运行
+                #   过渡章节: 跳过
+                #   日常章节: 每 N 章运行一次
+                should_run_director = self.director is not None and not should_skip_director(
+                    chapter_type, i, len(chapters)
+                )
+
+                if should_run_director:
+                    # 安全围栏检查：Director 分析消耗约 3000 tokens
+                    if not self._check_safety("director", additional_tokens=3000):
+                        self._log("安全围栏阻断 Director 分析", "warning")
+                        continue
+
                     try:
+                        # 传递已完成结果 + 下一章 hint + 剩余章节（供调度决策）
+                        remaining = chapters[i + 1 :]
                         analysis = self.director.analyze(
                             results,
                             chapters[i + 1][1],
+                            remaining_chapters=remaining,
                         )
                         # 注入策略指导到下一章 hint
                         if analysis.strategic_guidance:
@@ -610,12 +1129,27 @@ class AutoRunner:
                         # 记录警告
                         for warning in analysis.warnings:
                             self._log(f"Director 警告: {warning}", "warning")
+
+                        # 处理章节调度提议（P4 Director 增强）
+                        if analysis.scheduling_proposals:
+                            chapters = self._apply_scheduling_proposals(
+                                chapters,
+                                analysis.scheduling_proposals,
+                                i,
+                            )
+
                     except Exception as e:
                         self._log(f"Director 分析失败（不影响创作）: {e}", "warning")
+                elif chapter_type == ChapterType.TRANSITION:
+                    self._log("条件跳转: 过渡章节，跳过 Director 分析", "info")
 
             except Exception as e:
                 self._log(f"章节 {chapter_id} 创作失败: {e}", "error")
                 report.failed_chapters += 1
+
+        # ── 批处理延后的 Manager 更新 ──
+        if self._deferred_manager_updates:
+            self._process_deferred_manager_updates(results)
 
         report.chapters = results
         report.end_time = datetime.now().isoformat()
@@ -649,7 +1183,9 @@ class AutoRunner:
             lines.append(f"- 字数: {result.word_count}")
             lines.append(f"- 评分: {result.evaluation.total_score} 分")
             lines.append(f"- 重试: {result.retry_count} 次")
-            if result.manager_summary:
+            if result.manager_skipped:
+                lines.append("- Manager 更新: 延后批处理")
+            elif result.manager_summary:
                 lines.append(f"- 摘要: {result.manager_summary}")
             if result.mismatches:
                 lines.append(f"- 一致性问题: {len(result.mismatches)} 个")
@@ -705,10 +1241,13 @@ class AutoRunner:
             if report.chapters
             else 0
         )
+        deferred_count = sum(1 for r in report.chapters if r.manager_skipped)
 
         console.print(f"\n  总字数: {total_words}")
         console.print(f"  平均分: {avg_score:.1f}")
         console.print(f"  成功率: {report.successful_chapters}/{report.total_chapters}")
+        if deferred_count:
+            console.print(f"  条件管线: [dim]{deferred_count} 章 Manager 延后批处理[/dim]")
 
         if report.all_mismatches:
             warnings = sum(1 for m in report.all_mismatches if m.severity.value == "WARNING")

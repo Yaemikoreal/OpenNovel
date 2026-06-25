@@ -184,3 +184,69 @@ class TestLoomConfigSave:
 
         # 原始目录不应受影响，验证函数没有崩溃
         assert config.model == "gpt-4"
+
+
+class TestAgentConfigStageModels:
+    """AgentConfig 阶段模型测试。"""
+
+    def test_agent_config_with_stage_models(self) -> None:
+        """测试 AgentConfig 存储阶段模型。"""
+        from opennovel.core.config import AgentConfig
+
+        cfg = AgentConfig(
+            model="gpt-4",
+            think_model="gpt-4o-mini",
+            write_model="gpt-4",
+            revise_model="gpt-4",
+        )
+        assert cfg.think_model == "gpt-4o-mini"
+        assert cfg.write_model == "gpt-4"
+        assert cfg.revise_model == "gpt-4"
+
+    def test_agent_config_defaults(self) -> None:
+        """测试 AgentConfig 阶段模型默认值为 None。"""
+        from opennovel.core.config import AgentConfig
+
+        cfg = AgentConfig()
+        assert cfg.think_model is None
+        assert cfg.write_model is None
+        assert cfg.revise_model is None
+
+    def test_load_config_with_stage_models(self, tmp_path: Path) -> None:
+        """测试加载含阶段模型的配置。"""
+        config_path = tmp_path / "novel.yaml"
+        config_path.write_text(
+            "model: gpt-4\n"
+            "agents:\n"
+            "  writer:\n"
+            "    model: gpt-4\n"
+            "    think_model: gpt-4o-mini\n"
+            "    write_model: gpt-4\n"
+            "    revise_model: gpt-4\n",
+            encoding="utf-8",
+        )
+
+        config = LoomConfig.load(tmp_path)
+        assert config.agent_writer.think_model == "gpt-4o-mini"
+        assert config.agent_writer.write_model == "gpt-4"
+        assert config.agent_writer.revise_model == "gpt-4"
+
+    def test_save_roundtrip_stage_models(self, tmp_path: Path) -> None:
+        """测试保存和重新加载含阶段模型的配置。"""
+        from opennovel.core.config import AgentConfig
+
+        config = LoomConfig(
+            model="gpt-4",
+            agent_writer=AgentConfig(
+                model="gpt-4",
+                think_model="gpt-4o-mini",
+                write_model="gpt-4",
+            ),
+        )
+        config.save(tmp_path)
+
+        loaded = LoomConfig.load(tmp_path)
+        assert loaded.agent_writer.think_model == "gpt-4o-mini"
+        assert loaded.agent_writer.write_model == "gpt-4"
+        # revise_model 未设置 → 保存时被省略 → 加载后为 None
+        assert loaded.agent_writer.revise_model is None

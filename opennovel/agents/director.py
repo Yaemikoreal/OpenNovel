@@ -124,10 +124,20 @@ class Director:
         self,
         results: list,
         upcoming_chapter_hint: str,
+        remaining_chapters: list[tuple[str, str]] | None = None,
     ) -> str:
         """构建 Director 分析任务消息。"""
         analysis_data = self._build_analysis_data(results)
         event_data = self._build_event_data()
+
+        # 剩余章节信息（供调度决策参考）
+        remaining_section = ""
+        if remaining_chapters:
+            lines = ["\n### 剩余大纲章节"]
+            for cid, hint in remaining_chapters:
+                preview = hint[:80].replace("\n", " ")
+                lines.append(f"- {cid}: {preview}...")
+            remaining_section = "\n".join(lines)
 
         return f"""## 全局叙事分析任务
 
@@ -140,25 +150,28 @@ class Director:
 {event_data}
 
 ### 下一章大纲
-{upcoming_chapter_hint}
+{upcoming_chapter_hint}{remaining_section}
 
 请输出合法的 JSON 对象，包含以下字段：
 pacing_assessment、tension_curve、character_arc_status、
-strategic_guidance、creative_direction_adjustment、warnings。"""
+strategic_guidance、creative_direction_adjustment、warnings、
+scheduling_proposals（可选，当你认为需要调整大纲结构时填充）。"""
 
     def analyze(
         self,
         results: list,
         upcoming_chapter_hint: str,
+        remaining_chapters: list[tuple[str, str]] | None = None,
     ) -> DirectorAnalysis:
         """分析已完成章节的全局叙事状态，输出策略指导。
 
         Args:
             results: 已完成的 ChapterResult 列表
             upcoming_chapter_hint: 下一章的大纲提示
+            remaining_chapters: 剩余待创作章节列表，供调度决策参考
 
         Returns:
-            DirectorAnalysis 分析结果
+            DirectorAnalysis 分析结果（含可选的 scheduling_proposals）
         """
         if not results:
             return DirectorAnalysis(
@@ -168,7 +181,7 @@ strategic_guidance、creative_direction_adjustment、warnings。"""
                 strategic_guidance="",
             )
 
-        task_message = self._build_task_message(results, upcoming_chapter_hint)
+        task_message = self._build_task_message(results, upcoming_chapter_hint, remaining_chapters)
         messages = assemble_context(
             project_root=self.project_root,
             task_message=task_message,

@@ -118,8 +118,14 @@ class VectorStore:
         kwargs = {}
         if embed_model is not None:
             kwargs["embed_model"] = embed_model
+        else:
+            logger.info("无本地 embedding，使用 LlamaIndex 默认 embedding 模型")
 
-        self._index = VectorStoreIndex.from_documents(documents, **kwargs)
+        try:
+            self._index = VectorStoreIndex.from_documents(documents, **kwargs)
+        except Exception as e:
+            logger.error("向量索引构建失败（embedding 模型不可用）: %s", e)
+            return
 
         # 持久化
         self.index_dir.mkdir(parents=True, exist_ok=True)
@@ -170,6 +176,33 @@ class VectorStore:
         except Exception as e:
             logger.error("语义检索失败: %s", e)
             return []
+
+    def ensure_index(self, documents_dir: Path | None = None) -> bool:
+        """确保索引可用：优先加载已有索引，否则从源目录构建。
+
+        Args:
+            documents_dir: 源文档目录（当需要构建时使用）
+
+        Returns:
+            索引是否可用
+        """
+        if self._index is not None:
+            return True
+
+        # 尝试加载已有索引
+        if self.load_index():
+            return True
+
+        # 索引不存在且有源目录时自动构建
+        if documents_dir is not None and documents_dir.exists():
+            try:
+                self.build_index(documents_dir)
+            except Exception as e:
+                logger.warning("索引自动构建失败: %s", e)
+            return self._index is not None
+
+        logger.warning("索引不可用: 无持久化索引且未提供源目录")
+        return False
 
     def add_document(self, text: str, metadata: dict | None = None) -> None:
         """向索引中添加单个文档，触发增量更新。

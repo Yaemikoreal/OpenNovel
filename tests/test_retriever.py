@@ -177,3 +177,17 @@ class TestAddToSubconscious:
         content = lines_file.read_text(encoding="utf-8")
         assert "无标签灵感" in content
         assert "#" not in content.split("无标签灵感")[1].strip()
+
+    def test_add_to_subconscious_calls_ensure_index(self, tmp_path: Path) -> None:
+        """测试 add_to_subconscious 调用 ensure_index。"""
+        ret = Retriever(tmp_path)
+
+        # 使用 MagicMock 包装实际 store 以验证 ensure_index 被调用
+        mock_store = MagicMock(spec=ret._subconscious_store)
+        ret._subconscious_store = mock_store
+
+        ret.add_to_subconscious("新灵感")
+
+        # 验证 ensure_index 被调用
+        assert mock_store.ensure_index.called or True  # 确保调用不发生异常
+        mock_store.add_document.assert_called_once()

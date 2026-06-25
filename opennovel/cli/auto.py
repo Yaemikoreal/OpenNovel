@@ -67,8 +67,8 @@ def auto(
 
     if dry_run:
         rprint("[bold yellow]Dry Run 模式[/bold yellow] - 仅测试大纲解析")
-        runner = AutoRunner(project_root, config)
-        chapters_parsed = runner._parse_outline(outline_text)
+        from opennovel.core.auto_runner import parse_outline_from_text
+        chapters_parsed = parse_outline_from_text(outline_text)
         for i, (cid, hint) in enumerate(chapters_parsed[: config.target_chapters], 1):
             rprint(f"  {i}. {cid}: {hint[:60]}...")
         rprint(f"\n共 {min(len(chapters_parsed), config.target_chapters)} 章")
