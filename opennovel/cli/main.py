@@ -1,16 +1,17 @@
 """OpenNovel CLI 根命令 - Typer 命令路由入口。
 
 命令矩阵:
-- novel init    : 初始化小说项目目录
-- novel write   : Actor 交互式写作循环
-- novel stash   : 存入灵感潜意识池
-- novel commit  : 提取状态并固化
-- novel rollback: 回滚错误 commit
-- novel diff    : 检查正文与 Shadow 一致性
-- novel doctor  : 诊断世界线健康度
-- novel auto    : 四 Agent 自主创作循环
-- novel list    : 列出工作区所有小说项目
-- novel config  : 查看/设置全局配置
+- novel init      : 初始化小说项目目录
+- novel write     : Actor 交互式写作循环
+- novel stash     : 存入灵感潜意识池
+- novel commit    : 提取状态并固化
+- novel rollback  : 回滚错误 commit
+- novel diff      : 检查正文与 Shadow 一致性
+- novel doctor    : 诊断世界线健康度
+- novel auto      : 四 Agent 自主创作循环
+- novel list      : 列出工作区所有小说项目
+- novel config    : 查看/设置全局配置
+- novel foreshadow: 查看/管理伏笔追踪
 """
 
 import sys
@@ -91,6 +92,9 @@ def init(
         "draft",
         "outlines",
         "subconscious",
+        "foreshadowing",
+        "summaries",
+        "timeline",
         ".snapshots",
     ]
     for dir_name in directories:
@@ -437,6 +441,88 @@ def doctor(
     warnings = sum(1 for i in items if i.level == DiagnosticLevel.WARNING)
     oks = sum(1 for i in items if i.level in (DiagnosticLevel.OK, DiagnosticLevel.INFO))
     rprint(f"\n[dim]共 {errors} 个 ERROR, {warnings} 个 WARNING, {oks} 个 OK/INFO[/dim]")
+
+
+@app.command()
+def foreshadow(
+    list_items: bool = typer.Option(True, "--list", help="展示伏笔列表"),
+    add: str | None = typer.Option(None, "--add", help="手动添加伏笔描述（用于人工补充 Director 未检测到的伏笔）"),
+    path: str = typer.Argument(".", help="项目路径"),
+) -> None:
+    """查看或管理伏笔追踪表。
+
+    Director 每 3-5 章分析时会自动检测伏笔并更新状态。
+    此命令用于手动查看和补充伏笔。
+    """
+    from pathlib import Path
+
+    from rich.table import Table
+
+    from opennovel.storage.foreshadowing import ForeshadowStore
+
+    project_root = Path(path).resolve()
+    store = ForeshadowStore(project_root)
+
+    if add:
+        import json
+
+        from opennovel.schemas.foreshadowing import ForeshadowItem, ForeshadowStatus, ForeshadowType
+
+        state = store.load()
+        max_num = 0
+        for item in state.items:
+            if item.foreshadow_id.startswith("F"):
+                try:
+                    num = int(item.foreshadow_id[1:])
+                    max_num = max(max_num, num)
+                except ValueError:
+                    continue
+        new_id = f"F{max_num + 1:03d}"
+        new_item = ForeshadowItem(
+            foreshadow_id=new_id,
+            type=ForeshadowType.PLOT,
+            description=add,
+            buried_chapter="manual",
+            status=ForeshadowStatus.BURIED,
+        )
+        state.items.append(new_item)
+        store.save(state)
+        rprint(f"[green]✓[/green] 已添加伏笔: {new_id}")
+        return
+
+    # 展示伏笔列表
+    state = store.load()
+    if not state.items:
+        rprint("[dim]当前无伏笔记录。Director 会在章节分析时自动检测。[/dim]")
+        return
+
+    table = Table(title=f"伏笔追踪表 ({len(state.items)} 条)")
+    table.add_column("ID", style="cyan")
+    table.add_column("类型", style="blue")
+    table.add_column("描述")
+    table.add_column("埋设", style="dim")
+    table.add_column("状态", style="yellow")
+    table.add_column("关联角色", style="dim")
+
+    for item in state.items:
+        status_style = {
+            "buried": "yellow",
+            "in_progress": "cyan",
+            "closed": "green",
+        }.get(item.status.value, "white")
+        chars = ", ".join(item.related_character_ids) if item.related_character_ids else "-"
+        table.add_row(
+            item.foreshadow_id,
+            item.type.value,
+            item.description[:80],
+            item.buried_chapter,
+            f"[{status_style}]{item.status.value}[/{status_style}]",
+            chars,
+        )
+
+    console.print(table)
+    rprint(f"\n[dim]伏笔文件: {store.file_path}[/dim]")
+    rprint("[dim]新增伏笔: novel foreshadow --add \"描述...\"[/dim]")
 
 
 if __name__ == "__main__":

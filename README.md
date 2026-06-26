@@ -53,6 +53,8 @@ The system is organized around three decoupled layers:
 - **Agent Autonomy** — Writer can proactively query missing information mid-creation via tool-calling protocol. SafetyFence constrains recursion depth, token budget, and timeout.
 - **Canon Integrity Checking** — Rule-based validation against world-building documents. Detects violations of established setting rules without LLM dependency.
 - **Causal Event Graph** — NetworkX-based directed acyclic graph of narrative events. Supports path analysis, centrality computation, upstream/downstream causal tracing.
+- **Automatic Foreshadowing Tracking** — Director detects planted setups, tracks their progression, and identifies resolution points automatically every 3-5 chapters via causal chain analysis. `novel foreshadow` for manual override.
+- **Auto-Generated Timeline & Summaries** — Chapter summaries written on commit, event timeline converted from EventStore SQL at zero token cost. Both autonomous and interactive flows emit them automatically.
 - **Blind Mutation** — Key chapters generate multiple structural directions via orthogonal mutation dimensions (narrative structure, point of view, causality, thematic arc). Corrective mode targets weak dimensions from prior evaluation.
 - **Stage Model Routing** — Different LLM models per writing stage: cheap model for planning, flagship model for creation, premium model for revision.
 - **Model-Agnostic LLM Bus** — LiteLLM integration supports any provider (OpenAI, Anthropic, DeepSeek, Ollama, local models). Each agent can be independently configured.
@@ -289,6 +291,7 @@ novel <command> --help  # Command-specific help
 | `novel doctor <path>` | Diagnose project health: orphan characters, dangling references, dirty flags. |
 | `novel list` | List all projects in workspace with model, chapter count, word count. |
 | `novel config` | View or modify global configuration (default model, workspace directory). |
+| `novel foreshadow` | View or manage foreshadowing tracking table. `--add` for manual entries.
 
 ---
 
@@ -370,6 +373,14 @@ Agent-level (agents.writer.model)
 │   └── ...
 ├── outlines/            # Story outline (##-separated chapters)
 │   └── story.md
+├── foreshadowing/       # Auto-detected foreshadowing tracking
+│   └── foreshadowing.md
+├── summaries/           # Auto-generated chapter summaries
+│   ├── ch_001.md
+│   └── ch_002.md
+├── timeline/            # Auto-generated event timeline from SQL
+│   └── events.md
+├── planner_notes.md     # Director analysis record (appended)
 ├── subconscious/        # Inspiration fragments (SUBCONSCIOUS layer)
 ├── .snapshots/          # File-level incremental snapshots
 ├── .index/              # Vector index persistence
@@ -411,6 +422,9 @@ opennovel/
 ├── storage/              # Storage adapters
 │   ├── sqlite.py         # Event store (SQLModel)
 │   ├── metrics.py        # Metrics store
+│   ├── foreshadowing.py  # Foreshadowing Markdown read/write
+│   ├── timeline.py       # Timeline generator (SQL to Markdown)
+│   ├── summaries.py      # Chapter summary persistence
 │   ├── yaml_storage.py   # YAML frontmatter atomic read/write
 │   └── vector.py         # LlamaIndex vector index
 ├── schemas/              # Pydantic / SQLModel models
@@ -449,9 +463,9 @@ mypy --strict opennovel/
 
 ### Test Status
 
-- **817+ tests** across 39 test files
+- **850+ tests** across 40 test files
 - **88% code coverage**
-- Modules at or near 100% coverage: parser, state_manager, diff_checker, doctor, schemas, yaml_storage, metrics
+- Modules at or near 100% coverage: parser, state_manager, diff_checker, doctor, schemas, yaml_storage, metrics, foreshadowing
 
 ---
 

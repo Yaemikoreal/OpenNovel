@@ -20,6 +20,8 @@ from rich.text import Text
 
 from opennovel.core.llm import LLMBus
 from opennovel.core.state_manager import StateManager
+from opennovel.storage.summaries import write_summary
+from opennovel.storage.timeline import write_timeline
 
 commit_app = typer.Typer(help="状态审阅与固化")
 console = Console()
@@ -137,3 +139,24 @@ def commit(
     manager.update_snapshot_after(snapshot.snapshot_id, affected_files, event_ids)
 
     rprint(f"[bold green]✓ 已固化 {len(event_ids)} 个事件[/bold green]")
+
+    # 生成章节摘要（复用 Auditor 的事件数据）
+    try:
+        events_summary = "; ".join([f"({e.event_type}) {e.description[:60]}" for e in events[:5]])
+        write_summary(
+            project_root=project_root,
+            chapter_id=chapter_id,
+            chapter_title=chapter_meta.get("title", chapter_id),
+            chapter_summary=f"章节 {chapter_id} 已人工审阅并固化。\n\n关键事件:\n{events_summary}",
+            key_events=[f"[{e.event_type}] {e.description}" for e in events[:10]],
+        )
+        rprint(f"  [green]✓[/green] 摘要已生成: summaries/{chapter_id}.md")
+    except Exception as e:
+        rprint(f"  [yellow]摘要写入失败: {e}[/yellow]")
+
+    # 更新时间线
+    try:
+        write_timeline(project_root)
+        rprint(f"  [green]✓[/green] 时间线已更新")
+    except Exception as e:
+        rprint(f"  [yellow]时间线写入失败: {e}[/yellow]")

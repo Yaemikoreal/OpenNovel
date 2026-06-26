@@ -2,12 +2,14 @@
 
 Director 分析已完成章节的全局叙事状态，
 输出策略指导用于调整后续章节的创作方向，
-并可提议大纲调整（插入/跳过/合并章节）。
+并可提议大纲调整和伏笔检测结果。
 """
 
 from enum import Enum
 
 from pydantic import BaseModel, Field
+
+from opennovel.schemas.foreshadowing import ForeshadowItem
 
 
 class SchedulingAction(str, Enum):
@@ -47,7 +49,7 @@ class SchedulingProposal(BaseModel):
 class DirectorAnalysis(BaseModel):
     """Director Agent 的分析结果。
 
-    用于注入下一章的创作策略，并可提议大纲结构调整。
+    用于注入下一章的创作策略，并可提议大纲结构调整和伏笔追踪。
     """
 
     pacing_assessment: str
@@ -72,3 +74,8 @@ class DirectorAnalysis(BaseModel):
     """章节调度提议列表。Director 在发现节奏/张力/内容密度问题时，
     可提议插入补充章节、跳过无必要的章节或合并内容稀疏的章节。
     AutoRunner 将按顺序尝试执行这些提议（需用户确认）。"""
+
+    foreshadowing_items: list[ForeshadowItem] = []
+    """伏笔检测结果。Director 基于因果链和叙事上下文，
+    自动识别新伏笔并更新已有伏笔的状态。
+    AutoRunner 将合并到 foreshadowing/foreshadowing.md。"""

@@ -49,10 +49,12 @@
 
 ## 核心特性
 
-- **四 Agent 自主创作流水线** — Writer（规划 + 创作 + 修订）、Critic（五维评分 + 锚定反馈）、Manager（状态提取 + 事件记录）、Director（全局叙事分析 + 调度提议）。单命令启动完整流水线。
+- **四 Agent 自主创作流水线** — Writer（规划 + 创作 + 修订）、Critic（五维评分 + 锚定反馈）、Manager（状态提取 + 事件记录）、Director（全局叙事分析 + 调度提议 + 伏笔检测）。单命令启动完整流水线。
 - **Agent 自治** — Writer 可在创作过程中通过工具调用协议主动查询缺失信息。安全围栏约束递归深度、Token 预算和超时时间。
 - **世界观规则校验** — 基于关键词匹配的规则验证引擎，检测生成文本是否违反已建立的设定规则，不依赖 LLM。
 - **事件因果图** — 基于 NetworkX 的事件有向无环图，支持路径分析、中心性计算、上下游因果追溯。
+- **自动伏笔追踪** — Director 每 3-5 章基于因果链分析自动检测新伏笔、跟踪推进状态、标记收束节点。`novel foreshadow` 支持手动补充。
+- **时间线与历史摘要** — 每次 commit 自动生成章节摘要和时间线。时间线从 SQL 零成本转换，摘要复用 Manager 输出。
 - **盲目变异** — 关键章节通过正交变异维度（叙事结构、视点、因果、主题弧线）生成多个结构方案。纠错模式针对评分薄弱维度定向变异。
 - **阶段级模型路由** — 同一 Agent 在不同阶段使用不同模型：规划阶段用廉价模型，创作阶段用主力模型，修订阶段用旗舰模型。
 - **模型无关的 LLM 总线** — LiteLLM 集成支持任意提供商（OpenAI、Anthropic、DeepSeek、Ollama、本地模型）。每个 Agent 可独立配置。
@@ -282,6 +284,7 @@ novel <command> --help   # 查看具体命令帮助
 | `novel doctor <path>` | 诊断项目健康度：孤立角色、悬空引用、脏标记。 |
 | `novel list` | 列出工作区所有项目（模型、章节数、字数）。 |
 | `novel config` | 查看或修改全局配置（默认模型、工作区路径）。 |
+| `novel foreshadow` | 查看伏笔追踪表。`--add` 手动补充伏笔。 |
 
 ---
 
@@ -356,6 +359,14 @@ Agent 级（agents.writer.model）
 ├── characters/          # 角色档案（Markdown + YAML Frontmatter）
 ├── draft/               # 章节正文
 ├── outlines/            # 故事大纲
+├── foreshadowing/       # 自动伏笔追踪
+│   └── foreshadowing.md
+├── summaries/           # 自动生成章节摘要
+│   ├── ch_001.md
+│   └── ch_002.md
+├── timeline/            # 自动生成事件时间线
+│   └── events.md
+├── planner_notes.md     # Director 分析记录（追加式）
 ├── subconscious/        # 灵感碎片池（SUBCONSCIOUS 层）
 ├── .snapshots/          # 文件级增量快照
 ├── .index/              # 向量索引持久化
@@ -397,6 +408,9 @@ opennovel/
 ├── storage/              # 存储适配层
 │   ├── sqlite.py         # 事件账本（SQLModel）
 │   ├── metrics.py        # 指标数据库
+│   ├── foreshadowing.py  # 伏笔 Markdown 读写
+│   ├── timeline.py       # 时间线生成器（SQL → Markdown）
+│   ├── summaries.py      # 章节摘要持久化
 │   ├── yaml_storage.py   # YAML Frontmatter 原子读写
 │   └── vector.py         # LlamaIndex 向量索引
 ├── schemas/              # Pydantic / SQLModel 数据模型
@@ -432,7 +446,7 @@ mypy opennovel/
 
 ### 测试状态
 
-- **817+ 项测试**，覆盖 39 个测试文件
+- **850+ 项测试**，覆盖 40 个测试文件
 - **88% 代码覆盖率**
 - 核心模块覆盖率接近或达到 100%
 

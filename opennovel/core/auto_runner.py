@@ -28,6 +28,8 @@ from opennovel.schemas.director import SchedulingAction, SchedulingProposal
 from opennovel.schemas.evaluation import ChapterEvaluation
 from opennovel.schemas.outline import ChapterOutline
 from opennovel.storage.metrics import MetricsStore
+from opennovel.storage.summaries import write_summary
+from opennovel.storage.timeline import write_timeline
 from opennovel.storage.yaml_storage import YAMLStorage
 
 logger = logging.getLogger(__name__)
@@ -957,6 +959,19 @@ class AutoRunner:
             manager_summary = ""
             event_ids: list[str] = []
 
+            # 延后章节也写入摘要（用已知信息，不依赖 Manager 实时输出）
+            try:
+                write_summary(
+                    project_root=self.project_root,
+                    chapter_id=chapter_id,
+                    chapter_title=outline.title,
+                    chapter_summary=f"评分 {best_evaluation.total_score}，延后批处理。",
+                    total_score=best_evaluation.total_score,
+                    word_count=word_count,
+                )
+            except Exception as e:
+                self._log(f"摘要写入失败（不影响创作）: {e}", "warning")
+
             # 记录延后批处理数据
             self._deferred_manager_updates.append(
                 DeferredManagerData(
@@ -980,6 +995,28 @@ class AutoRunner:
                 )
                 manager_summary = manager_result.chapter_summary
                 event_ids = [e.event_id for e in manager_result.events] if manager_result else []
+
+                # 自动写入章节摘要（零额外 Token，复用 Manager 输出）
+                try:
+                    key_events = [e.description for e in manager_result.events[:10]] if manager_result.events else None
+                    char_changes = [
+                        f"{u.character_id}.{u.field}: {u.value} ({u.reason})"
+                        for u in manager_result.character_updates[:10]
+                    ] if manager_result.character_updates else None
+                    write_summary(
+                        project_root=self.project_root,
+                        chapter_id=chapter_id,
+                        chapter_title=outline.title,
+                        chapter_summary=manager_summary,
+                        total_score=best_evaluation.total_score,
+                        word_count=word_count,
+                        key_events=key_events,
+                        character_changes=char_changes,
+                        mismatches=[str(m) for m in chapter_mismatches] if chapter_mismatches else None,
+                    )
+                except Exception as e:
+                    self._log(f"摘要写入失败（不影响创作）: {e}", "warning")
+
             except Exception as e:
                 self._log(f"Manager 更新失败: {e}", "error")
                 manager_summary = ""
@@ -1150,6 +1187,13 @@ class AutoRunner:
         # ── 批处理延后的 Manager 更新 ──
         if self._deferred_manager_updates:
             self._process_deferred_manager_updates(results)
+
+        # 写入最终时间线
+        try:
+            write_timeline(self.project_root)
+            self._log(f"时间线已写入: timeline/events.md", "info")
+        except Exception as e:
+            self._log(f"时间线写入失败（不影响报告）: {e}", "warning")
 
         report.chapters = results
         report.end_time = datetime.now().isoformat()

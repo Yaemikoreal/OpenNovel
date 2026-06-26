@@ -2,15 +2,19 @@
 
 从全局视角分析已完成章节的叙事状态，
 输出策略指导用于调整后续章节的创作方向。
+集成伏笔检测（foreshadowing）和规划笔记（planner_notes）自动落盘。
 """
 
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from opennovel.core.context_assembler import ContextStrategy, assemble_context
 from opennovel.core.llm import LLMBus
 from opennovel.schemas.director import DirectorAnalysis
+from opennovel.schemas.foreshadowing import ForeshadowItem
+from opennovel.storage.foreshadowing import ForeshadowStore
 from opennovel.storage.sqlite import EventStore
 
 logger = logging.getLogger(__name__)
@@ -25,6 +29,10 @@ class Director:
         director = Director(llm_bus=bus, project_root=root, event_store=es)
         analysis = director.analyze(results, "下一章大纲提示")
         print(analysis.strategic_guidance)
+
+    新增功能:
+        - 伏笔检测: 分析时自动检测新伏笔并更新已有伏笔状态
+        - 规划笔记: 分析结果自动追加到 planner_notes.md
     """
 
     def __init__(
@@ -39,6 +47,90 @@ class Director:
         self.event_store = event_store
         self.prompt_path = prompt_path or (
             Path(__file__).parent.parent / "prompts" / "director.v1.md"
+        )
+        self._foreshadow_store: ForeshadowStore | None = None
+        self._planner_notes_path = project_root / "planner_notes.md"
+
+    def _get_foreshadow_store(self) -> ForeshadowStore:
+        """延迟获取 ForeshadowStore 实例。"""
+        if self._foreshadow_store is None:
+            from opennovel.storage.foreshadowing import ForeshadowStore
+
+            self._foreshadow_store = ForeshadowStore(self.project_root)
+        return self._foreshadow_store
+
+    def _append_to_planner_notes(self, analysis: DirectorAnalysis) -> None:
+        """将 Director 分析结果追加到 planner_notes.md。
+
+        Args:
+            analysis: Director 分析结果
+        """
+        if not analysis.strategic_guidance and not analysis.warnings:
+            return
+
+        lines = []
+        lines.append(
+            f"\n---\n## 分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+        )
+        lines.append(f"- **节奏评估**: {analysis.pacing_assessment}")
+        lines.append(f"- **张力曲线**: {analysis.tension_curve}")
+        if analysis.character_arc_status:
+            lines.append("- **角色弧线**:")
+            for cid, status in analysis.character_arc_status.items():
+                lines.append(f"  - {cid}: {status}")
+        lines.append(f"- **策略指导**: {analysis.strategic_guidance}")
+        if analysis.creative_direction_adjustment:
+            lines.append(f"- **方向调整**: {analysis.creative_direction_adjustment}")
+        if analysis.warnings:
+            lines.append("- **警告**:")
+            for w in analysis.warnings:
+                lines.append(f"  - {w}")
+        if analysis.foreshadowing_items:
+            lines.append(f"- **伏笔更新**: {len(analysis.foreshadowing_items)} 条")
+            closed = sum(1 for f in analysis.foreshadowing_items if f.status.value == "closed")
+            new_buried = sum(1 for f in analysis.foreshadowing_items if f.status.value == "buried")
+            if new_buried:
+                lines.append(f"  - 新增埋设: {new_buried} 条")
+            if closed:
+                lines.append(f"  - 已收束: {closed} 条")
+        if analysis.scheduling_proposals:
+            lines.append("- **调度提议**:")
+            for p in analysis.scheduling_proposals:
+                lines.append(f"  - [{p.action}] {p.target_chapter_id}: {p.rationale}")
+        lines.append("")
+
+        content = "\n".join(lines)
+        self._planner_notes_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(self._planner_notes_path, "a", encoding="utf-8") as f:
+                f.write(content)
+            logger.info("planner_notes.md 已更新")
+        except Exception as e:
+            logger.warning("写入 planner_notes.md 失败: %s", e)
+
+    def _update_foreshadowing(self, analysis: DirectorAnalysis) -> None:
+        """将 Director 的伏笔检测结果合并到 foreshadowing.md。
+
+        Args:
+            analysis: Director 分析结果（含 foreshadowing_items）
+        """
+        if not analysis.foreshadowing_items:
+            return
+
+        store = self._get_foreshadow_store()
+        current_state = store.load()
+        merged = store.merge_updates(current_state, analysis.foreshadowing_items)
+        store.save(merged)
+
+        buried = sum(1 for i in merged.items if i.status.value == "buried")
+        progress = sum(1 for i in merged.items if i.status.value == "in_progress")
+        closed = sum(1 for i in merged.items if i.status.value == "closed")
+        logger.info(
+            "伏笔已更新: 共 %d 条 (已埋设 %d / 推进中 %d / 已收束 %d)",
+            len(merged.items),
+            buried,
+            progress,
+            closed,
         )
 
     def _load_prompt(self) -> str:
@@ -120,6 +212,26 @@ class Director:
 
         return "\n".join(lines)
 
+    def _build_foreshadowing_data(self) -> str:
+        """从 ForeshadowStore 加载已有伏笔状态，供 Director 分析上下文。
+
+        Returns:
+            已有伏笔的 Markdown 描述
+        """
+        store = self._get_foreshadow_store()
+        state = store.load()
+
+        if not state.items:
+            return "\n### 已有伏笔\n当前无已有伏笔。"
+
+        lines = ["\n### 已有伏笔"]
+        for item in state.items:
+            lines.append(
+                f"- {item.foreshadow_id} [{item.type.value}] ({item.status.value}): "
+                f"{item.description} — 埋设于 {item.buried_chapter}"
+            )
+        return "\n".join(lines)
+
     def _build_task_message(
         self,
         results: list,
@@ -129,6 +241,7 @@ class Director:
         """构建 Director 分析任务消息。"""
         analysis_data = self._build_analysis_data(results)
         event_data = self._build_event_data()
+        foreshadowing_data = self._build_foreshadowing_data()
 
         # 剩余章节信息（供调度决策参考）
         remaining_section = ""
@@ -148,6 +261,7 @@ class Director:
 
 ### 事件时间线
 {event_data}
+{foreshadowing_data}
 
 ### 下一章大纲
 {upcoming_chapter_hint}{remaining_section}
@@ -155,7 +269,18 @@ class Director:
 请输出合法的 JSON 对象，包含以下字段：
 pacing_assessment、tension_curve、character_arc_status、
 strategic_guidance、creative_direction_adjustment、warnings、
-scheduling_proposals（可选，当你认为需要调整大纲结构时填充）。"""
+scheduling_proposals（可选，当你认为需要调整大纲结构时填充）、
+foreshadowing_items（可选，伏笔检测结果列表）。
+
+每个 foreshadowing_item 包含:
+- foreshadow_id: 伏笔 ID（新伏笔自动编号 F001/F002...，已有伏笔用原 ID）
+- type: "plot" / "character" / "theme" / "world"
+- description: 伏笔描述
+- buried_chapter: 埋设章节 ID
+- status: "buried" / "in_progress" / "closed"
+- related_character_ids: 关联角色 ID 列表
+- expected_close_chapter: 预计回收章节（可用区间 "ch_008-ch_012"）
+- notes: 备注（可选）"""
 
     def analyze(
         self,
@@ -171,7 +296,7 @@ scheduling_proposals（可选，当你认为需要调整大纲结构时填充）
             remaining_chapters: 剩余待创作章节列表，供调度决策参考
 
         Returns:
-            DirectorAnalysis 分析结果（含可选的 scheduling_proposals）
+            DirectorAnalysis 分析结果（含可选的 scheduling_proposals 和 foreshadowing_items）
         """
         if not results:
             return DirectorAnalysis(
@@ -198,10 +323,22 @@ scheduling_proposals（可选，当你认为需要调整大纲结构时填充）
                     raise ValueError("LLM 返回空文本")
                 analysis = self._parse_analysis_from_text(text)
                 logger.info(
-                    "Director 分析完成: %s, 张力=%s",
+                    "Director 分析完成: %s, 张力=%s, 伏笔=%d条",
                     analysis.pacing_assessment,
                     analysis.tension_curve,
+                    len(analysis.foreshadowing_items),
                 )
+
+                # 自动落盘：伏笔更新 + 规划笔记
+                try:
+                    self._update_foreshadowing(analysis)
+                except Exception as e:
+                    logger.warning("伏笔更新失败（不影响分析）: %s", e)
+                try:
+                    self._append_to_planner_notes(analysis)
+                except Exception as e:
+                    logger.warning("规划笔记写入失败（不影响分析）: %s", e)
+
                 return analysis
             except (json.JSONDecodeError, ValueError, KeyError) as e:
                 last_error = e
@@ -233,4 +370,11 @@ scheduling_proposals（可选，当你认为需要调整大纲结构时填充）
             cleaned = "\n".join(lines)
 
         data = json.loads(cleaned)
+
+        # 处理 foreshadowing_items 中的 ForeshadowItem 对象
+        if "foreshadowing_items" in data and data["foreshadowing_items"]:
+            data["foreshadowing_items"] = [
+                ForeshadowItem(**item) for item in data["foreshadowing_items"]
+            ]
+
         return DirectorAnalysis(**data)

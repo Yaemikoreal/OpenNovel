@@ -35,6 +35,17 @@
 - 是否有章节因前文已覆盖而可以跳过
 - 张力曲线平坦时考虑插入补充章节，压力堆积过高时考虑插入缓冲章节
 
+### 6. 伏笔追踪（关键新增）
+- **新伏笔检测**: 新引入的设定、角色关系、物品、地点、能力限制、预言等是否可能是伏笔
+- **状态推进**: 已有伏笔在本章是否有新进展 → 标为 in_progress
+- **伏笔收束**: 已有伏笔是否在本章收束（因果闭环、谜底揭晓）→ 标为 closed
+- 每个伏笔包含: foreshadow_id（如 F001/F002）、type（plot/character/theme/world）、description、buried_chapter、status、expected_close_chapter
+- 对比已有伏笔表更新状态，不要重复创建已有 ID
+- 当前大纲章节是否合理，是否有需要补充过渡/高潮章节
+- 是否有章节内容密度不足，需要合并
+- 是否有章节因前文已覆盖而可以跳过
+- 张力曲线平坦时考虑插入补充章节，压力堆积过高时考虑插入缓冲章节
+
 ## 输出规则
 
 1. **战略性而非战术性**: 你关注的是"接下来应该往哪个方向走"，而不是"这一段应该怎么写"
@@ -57,8 +68,19 @@
   "strategic_guidance": "下一章应放缓节奏，安排角色内心独白，为后续高潮蓄力。",
   "creative_direction_adjustment": "增加角色间的对话场景，减少外部冲突。",
   "warnings": [],
-  "scheduling_proposals": []
-}
+  "scheduling_proposals": [],
+  "foreshadowing_items": [
+    {
+      "foreshadow_id": "F001",
+      "type": "plot",
+      "description": "角色 A 提到的那把刀来历不明，暗示后续会揭示其真实用途",
+      "buried_chapter": "ch_001",
+      "status": "buried",
+      "related_character_ids": ["char_001"],
+      "expected_close_chapter": "ch_008-ch_010",
+      "notes": "刀的来历可作为第二卷的核心冲突引子"
+    }
+  ]
 ```
 
 当需要提议大纲调整时，填充 scheduling_proposals 字段：
