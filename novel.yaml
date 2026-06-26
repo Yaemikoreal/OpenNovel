@@ -1,4 +1,0 @@
-model: deepseek/deepseek-v4-flash
-output_reserve: 2000
-token_budget: 8000
-version: 1.0.1

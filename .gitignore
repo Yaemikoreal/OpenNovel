@@ -73,3 +73,9 @@ test_novel/
 设计文档/
 CLAUDE.md
 CONTEXT.md
+
+# Test artifacts (generated during test runs)
+/canon/
+/characters/
+/draft/
+/novel.yaml
