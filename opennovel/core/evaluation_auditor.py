@@ -121,7 +121,7 @@ class EvaluationAuditor:
             if abs(second_half - first_half) > 10:
                 direction = "上升" if second_half > first_half else "下降"
                 report["alerts"].append(
-                    f"评分趋势{方向}: 后半段均值 {second_half}，前半段 {first_half}，"
+                    f"评分趋势{direction}: 后半段均值 {second_half}，前半段 {first_half}，"
                     f"差异 {abs(second_half - first_half):.1f} 分"
                 )
 

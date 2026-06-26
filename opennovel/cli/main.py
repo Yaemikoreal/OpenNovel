@@ -161,23 +161,6 @@ def init(
         rprint(f"  [green]✓[/green] 创建目录: {dir_name}/")
     storage = YAMLStorage()
 
-    # 创建标准目录结构
-    directories = [
-        "canon",
-        "characters",
-        "draft",
-        "outlines",
-        "subconscious",
-        "foreshadowing",
-        "summaries",
-        "timeline",
-        ".snapshots",
-    ]
-    for dir_name in directories:
-        dir_path = project_root / dir_name
-        dir_path.mkdir(parents=True, exist_ok=True)
-        rprint(f"  [green]✓[/green] 创建目录: {dir_name}/")
-
     # 生成角色模板
     char_template = {
         "id": "char_001",
@@ -239,7 +222,7 @@ def init(
     if not config_path.exists():
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
-        rprint(f"  [green]✓[/green] 创建配置文件: novel.yaml (model: {global_cfg.default_model})")
+        rprint(f"  [green]✓[/green] 创建配置文件: novel.yaml (model: {effective_model})")
 
     rprint(f"[bold green]✅ 项目初始化完成！[/bold green]")
     rprint(f"  项目路径: {project_root}")

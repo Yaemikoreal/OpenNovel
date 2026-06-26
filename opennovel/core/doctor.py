@@ -403,7 +403,12 @@ class Doctor:
             "warnings": warnings,
             "info": info,
             "items": [
-                {"level": i.level.value, "category": i.category, "message": i.message}
+                {
+                    "level": i.level.value,
+                    "category": i.category,
+                    "message": i.message,
+                    "details": i.details,
+                }
                 for i in items
             ],
         }

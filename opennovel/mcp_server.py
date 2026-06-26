@@ -700,11 +700,11 @@ async def _handle_foreshadow(args: dict) -> str:
         from opennovel.storage.foreshadowing import ForeshadowStore
 
         store = ForeshadowStore(path)
+        state = store.load()
 
         if action == "list":
-            items = store.get_all()
             return json.dumps({
-                "total": len(items),
+                "total": len(state.items),
                 "items": [
                     {
                         "id": i.id,
@@ -713,7 +713,7 @@ async def _handle_foreshadow(args: dict) -> str:
                         "type": i.type.value if hasattr(i.type, "value") else i.type,
                         "target_chapter": i.target_chapter,
                     }
-                    for i in items
+                    for i in state.items
                 ],
             }, ensure_ascii=False, indent=2)
 
@@ -721,14 +721,36 @@ async def _handle_foreshadow(args: dict) -> str:
             description = args.get("description", "")
             if not description:
                 return json.dumps({"status": "error", "message": "add 操作需要 description 参数"}, ensure_ascii=False)
-            item = store.add_item(description=description)
-            return json.dumps({"status": "success", "id": item.id}, ensure_ascii=False)
+            from opennovel.schemas.foreshadowing import ForeshadowItem, ForeshadowStatus, ForeshadowType
+            max_num = 0
+            for item in state.items:
+                try:
+                    num = int(item.id.lstrip("F"))
+                    if num > max_num:
+                        max_num = num
+                except (ValueError, AttributeError):
+                    pass
+            new_id = f"F{max_num + 1:03d}"
+            new_item = ForeshadowItem(
+                id=new_id,
+                description=description,
+                status=ForeshadowStatus.ACTIVE,
+                type=ForeshadowType.PLOT,
+            )
+            state.items.append(new_item)
+            store.save(state)
+            return json.dumps({"status": "success", "id": new_id}, ensure_ascii=False)
 
         elif action == "resolve":
             item_id = args.get("id", "")
             if not item_id:
                 return json.dumps({"status": "error", "message": "resolve 操作需要 id 参数"}, ensure_ascii=False)
-            store.resolve_item(item_id)
+            from opennovel.schemas.foreshadowing import ForeshadowStatus
+            for item in state.items:
+                if item.id == item_id:
+                    item.status = ForeshadowStatus.RESOLVED
+                    break
+            store.save(state)
             return json.dumps({"status": "success", "id": item_id, "action": "resolved"}, ensure_ascii=False)
 
         else:

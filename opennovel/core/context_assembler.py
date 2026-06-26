@@ -110,7 +110,7 @@ def detect_strategy(max_window: int) -> ContextStrategy:
     """
     if max_window < _FRUGAL上限:
         return ContextStrategy.FRUGAL
-    elif max_window < _STANDARD上限:
+    elif max_window <= _STANDARD上限:
         return ContextStrategy.STANDARD
     else:
         return ContextStrategy.PANORAMIC

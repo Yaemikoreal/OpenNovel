@@ -273,7 +273,8 @@ class LLMBus:
         reasoning = None
         try:
             data = json.loads(response_text)
-            reasoning = data.get("reasoning") or data.get("critique_reasoning")
+            if isinstance(data, dict):
+                reasoning = data.get("reasoning") or data.get("critique_reasoning")
         except (json.JSONDecodeError, TypeError):
             return  # 非 JSON 响应（如 Write 阶段），跳过
 
