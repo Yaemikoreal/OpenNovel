@@ -18,7 +18,12 @@ from opennovel.core.agent_autonomy import (
     ToolCallExecutor,
     ToolCallParser,
 )
-from opennovel.core.context_assembler import ContextStrategy, assemble_context
+from opennovel.core.context_assembler import (
+    ContextStrategy,
+    assemble_context,
+    detect_strategy,
+    get_model_window,
+)
 from opennovel.core.hybrid_retriever import HybridRetriever
 from opennovel.core.llm import LLMBus
 from opennovel.core.mutation_strategy import build_mutation_prompt_hint, select_mutation_plan
@@ -61,6 +66,7 @@ class Writer:
         think_model: str | None = None,
         write_model: str | None = None,
         revise_model: str | None = None,
+        write_model_climax: str | None = None,
         tool_registry: Any | None = None,
         safety_fence: Any | None = None,
         autonomy_config: AutonomousConfig | None = None,
@@ -79,6 +85,7 @@ class Writer:
         self.think_model = think_model
         self.write_model = write_model or think_model
         self.revise_model = revise_model or write_model or think_model
+        self.write_model_climax = write_model_climax  # 高潮章节专用模型
         # Agent 自治（ADR 0006）
         self.tool_registry = tool_registry
         self.safety_fence = safety_fence
@@ -142,7 +149,7 @@ class Writer:
             subconscious_content=subconscious_content,
             causal_chain_context=causal_chain_context,
             active_characters=self._get_all_character_ids(),
-            strategy=ContextStrategy.STANDARD,
+            strategy=detect_strategy(get_model_window(getattr(self.llm_bus, 'model', ''))),
         )
 
     def _build_think_task_message(
@@ -543,6 +550,7 @@ class Writer:
         outline: ChapterOutline,
         previous_chapter_text: str = "",
         additional_knowledge: str = "",
+        chapter_hint: str = "",
     ) -> str:
         """创作阶段：根据大纲创作章节正文。
 
@@ -551,6 +559,7 @@ class Writer:
             outline: 思考阶段输出的大纲
             previous_chapter_text: 前一章正文
             additional_knowledge: ToolRegistry 主动检索的补充上下文（可选）
+            chapter_hint: 大纲提示文本，用于章节类型感知的模型选择
 
         Returns:
             章节正文 (纯文本)
@@ -564,11 +573,19 @@ class Writer:
             task_message += f"\n\n{additional_knowledge}"
         messages = self._build_context(task_message)
 
+        # 章节类型感知的模型选择
+        model = self.write_model
+        if chapter_hint and self.write_model_climax:
+            from opennovel.core.chapter_utils import ChapterType, detect_chapter_type
+            if detect_chapter_type(chapter_hint) == ChapterType.CLIMAX:
+                model = self.write_model_climax
+                logger.info("高潮章节 %s 使用增强模型: %s", chapter_id, model)
+
         response = self.llm_bus.chat(
             messages,
             temperature=0.8,
             max_tokens=4000,
-            model=self.write_model,
+            model=model,
         )
         text = response.choices[0].message.content
         if not text:
@@ -582,6 +599,7 @@ class Writer:
         chapter_id: str,
         outline: ChapterOutline,
         previous_chapter_text: str = "",
+        chapter_hint: str = "",
     ) -> str:
         """创作阶段带自治能力：可 mid-write 主动查询缺失信息。
 
@@ -595,6 +613,7 @@ class Writer:
             chapter_id: 章节 ID
             outline: 思考阶段输出的大纲
             previous_chapter_text: 前一章正文
+            chapter_hint: 大纲提示文本，用于章节类型感知的模型选择
 
         Returns:
             章节正文 (纯文本)
@@ -626,8 +645,16 @@ class Writer:
             config=self.autonomy_config,
         )
 
+        # 章节类型感知的模型选择
+        model = self.write_model
+        if chapter_hint and self.write_model_climax:
+            from opennovel.core.chapter_utils import ChapterType, detect_chapter_type
+            if detect_chapter_type(chapter_hint) == ChapterType.CLIMAX:
+                model = self.write_model_climax
+                logger.info("高潮章节 %s 使用增强模型: %s", chapter_id, model)
+
         # 执行自治循环
-        return loop.execute(messages, model=self.write_model, agent_name="writer")
+        return loop.execute(messages, model=model, agent_name="writer")
 
     def _build_hot_fix_task_message(
         self,

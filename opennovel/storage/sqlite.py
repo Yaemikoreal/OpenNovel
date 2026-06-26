@@ -227,6 +227,35 @@ class EventStore:
             statement = select(EventLog).order_by(EventLog.id)
             return list(session.exec(statement).all())
 
+    def get_events_up_to(
+        self,
+        character_id: str,
+        chapter_id: str,
+    ) -> list[EventLog]:
+        """查询指定角色截至某章节的所有事件（时间序）。
+
+        用于 State Projector 的时间轴折叠操作：
+        获取角色在某个章节之前的所有事件，按时间序排列，
+        以便重放事件流归约为状态快照。
+
+        Args:
+            character_id: 角色 Canonical ID
+            chapter_id: 截止章节 ID（含该章节）
+
+        Returns:
+            事件列表，按 chapter_id 升序排列
+        """
+        with Session(self._engine) as session:
+            statement = (
+                select(EventLog)
+                .where(
+                    EventLog.character_id == character_id,
+                    EventLog.chapter_id <= chapter_id,
+                )
+                .order_by(EventLog.chapter_id.asc())
+            )
+            return list(session.exec(statement).all())
+
     # ── 因果链 DAG 查询 (Phase 2.1) ──────────────────────────────────
 
     def get_causal_chain(

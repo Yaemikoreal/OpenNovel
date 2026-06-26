@@ -859,7 +859,7 @@ class TestDetectChapterType:
 
     def test_detect_climax(self) -> None:
         """测试高潮关键词触发 CLIMAX 类型。"""
-        from opennovel.core.auto_runner import ChapterType, detect_chapter_type
+        from opennovel.core.chapter_utils import ChapterType, detect_chapter_type
 
         for hint in [
             "故事来到转折点",
@@ -872,7 +872,7 @@ class TestDetectChapterType:
 
     def test_detect_transition(self) -> None:
         """测试过渡关键词触发 TRANSITION 类型。"""
-        from opennovel.core.auto_runner import ChapterType, detect_chapter_type
+        from opennovel.core.chapter_utils import ChapterType, detect_chapter_type
 
         for hint in [
             "过渡章节",
@@ -884,7 +884,7 @@ class TestDetectChapterType:
 
     def test_detect_routine(self) -> None:
         """测试无特殊关键词时返回 ROUTINE 类型。"""
-        from opennovel.core.auto_runner import ChapterType, detect_chapter_type
+        from opennovel.core.chapter_utils import ChapterType, detect_chapter_type
 
         for hint in [
             "普通的冒险",
@@ -896,7 +896,7 @@ class TestDetectChapterType:
 
     def test_case_insensitive(self) -> None:
         """测试关键词匹配不区分大小写。"""
-        from opennovel.core.auto_runner import ChapterType, detect_chapter_type
+        from opennovel.core.chapter_utils import ChapterType, detect_chapter_type
 
         assert detect_chapter_type("CLIMAX") == ChapterType.CLIMAX
         assert detect_chapter_type("Transition") == ChapterType.TRANSITION
@@ -956,25 +956,29 @@ class TestShouldSkipDirector:
 
     def test_skip_last_chapter(self) -> None:
         """测试最后一章跳过 Director。"""
-        from opennovel.core.auto_runner import ChapterType, should_skip_director
+        from opennovel.core.auto_runner import should_skip_director
+        from opennovel.core.chapter_utils import ChapterType
 
         assert should_skip_director(ChapterType.CLIMAX, 4, 5) is True
 
     def test_run_climax(self) -> None:
         """测试高潮章节强制运行 Director。"""
-        from opennovel.core.auto_runner import ChapterType, should_skip_director
+        from opennovel.core.auto_runner import should_skip_director
+        from opennovel.core.chapter_utils import ChapterType
 
         assert should_skip_director(ChapterType.CLIMAX, 0, 3) is False
 
     def test_skip_transition(self) -> None:
         """测试过渡章节跳过 Director。"""
-        from opennovel.core.auto_runner import ChapterType, should_skip_director
+        from opennovel.core.auto_runner import should_skip_director
+        from opennovel.core.chapter_utils import ChapterType
 
         assert should_skip_director(ChapterType.TRANSITION, 0, 3) is True
 
     def test_routine_every_n_chapters(self) -> None:
         """测试日常章节每 N 章运行一次 Director。"""
-        from opennovel.core.auto_runner import DIRECTOR_INTERVAL, ChapterType, should_skip_director
+        from opennovel.core.auto_runner import DIRECTOR_INTERVAL, should_skip_director
+        from opennovel.core.chapter_utils import ChapterType
 
         # 第 0 章（首个日常章节）→ 运行
         assert should_skip_director(ChapterType.ROUTINE, 0, 5) is False
@@ -1086,7 +1090,8 @@ class TestConditionalPipeline:
         runner.manager.update.return_value = make_manager_result()
 
         # 模拟积累延后数据
-        from opennovel.core.auto_runner import ChapterType, DeferredManagerData
+        from opennovel.core.auto_runner import DeferredManagerData
+        from opennovel.core.chapter_utils import ChapterType
 
         runner._deferred_manager_updates.append(
             DeferredManagerData(
@@ -1131,7 +1136,8 @@ class TestConditionalPipeline:
         """测试批处理时找不到对应 ChapterResult 不崩溃。"""
         runner = AutoRunner(project_root=empty_project_root, config=default_config)
 
-        from opennovel.core.auto_runner import ChapterType, DeferredManagerData
+        from opennovel.core.auto_runner import DeferredManagerData
+        from opennovel.core.chapter_utils import ChapterType
 
         runner._deferred_manager_updates.append(
             DeferredManagerData(
@@ -1162,7 +1168,8 @@ class TestConditionalPipeline:
         """测试批处理中 Manager 失败不中断整体流程。"""
         runner = AutoRunner(project_root=empty_project_root, config=default_config)
 
-        from opennovel.core.auto_runner import ChapterType, DeferredManagerData
+        from opennovel.core.auto_runner import DeferredManagerData
+        from opennovel.core.chapter_utils import ChapterType
 
         runner._deferred_manager_updates.append(
             DeferredManagerData(

@@ -43,11 +43,12 @@ class MockLLMResponse:
 class MockLLMBus:
     """模拟 LLMBus，可控的响应序列。"""
 
-    def __init__(self, responses: list[str]) -> None:
+    def __init__(self, responses: list[str], model: str = "gpt-4") -> None:
         self.responses = [MockLLMResponse(r) for r in responses]
         self.call_count = 0
         self.last_messages: list[dict[str, str]] = []
         self.last_model: str | None = None
+        self.model = model
 
     def chat(
         self,

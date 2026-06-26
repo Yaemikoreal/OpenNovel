@@ -13,9 +13,12 @@
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+from opennovel.core.config import LoomConfig
+from opennovel.storage.metrics import MetricsStore
 from opennovel.storage.sqlite import EventStore
 from opennovel.storage.yaml_storage import YAMLStorage
 
@@ -304,3 +307,105 @@ class Doctor:
             )
 
         return items
+
+    def generate_dashboard(self) -> dict:
+        """生成项目健康面板数据。
+
+        Returns:
+            包含各面板区块的字典:
+            {
+                "config": {"status": "...", "model": "...", ...},
+                "progress": {"chapters": "...", "total": "...", ...},
+                "critic": {"total": N, "avg_score": N, ...},
+                "diagnosis": {"errors": N, "warnings": N, ...},
+            }
+        """
+        dashboard: dict = {}
+
+        # ── 配置面板 ──
+        try:
+            cfg = LoomConfig.load(self.project_root)
+            model_valid = bool(cfg.model)
+            dashboard["config"] = {
+                "status": "valid" if model_valid else "missing_model",
+                "model": cfg.model or "未配置",
+                "token_budget": cfg.token_budget,
+                "output_reserve": cfg.output_reserve,
+                "has_api_key": bool(cfg.api_key),
+                "version": cfg.version,
+                "creative_direction": cfg.creative_direction or "",
+                "director_enabled": cfg.director_enabled,
+            }
+        except Exception as e:
+            dashboard["config"] = {"status": "error", "error": str(e)}
+
+        # ── 章节进度面板 ──
+        draft_dir = self.project_root / "draft"
+        if draft_dir.exists():
+            chapters = sorted(draft_dir.glob("ch_*.md"))
+            dashboard["progress"] = {
+                "chapters": len(chapters),
+                "files": [c.stem for c in chapters],
+                "latest": chapters[-1].stem if chapters else "",
+            }
+        else:
+            dashboard["progress"] = {"chapters": 0, "files": [], "latest": ""}
+
+        # ── 角色统计面板 ──
+        chars = self._scan_characters()
+        dashboard["characters"] = {
+            "total": len(chars),
+            "ids": list(chars.keys()),
+        }
+
+        # ── 事件统计面板 ──
+        try:
+            store = EventStore(self.project_root / ".novel.db")
+            events = store.get_all_events()
+            dashboard["events"] = {
+                "total": len(events),
+                "types": list({e.event_type for e in events}),
+            }
+        except Exception:
+            dashboard["events"] = {"total": 0, "types": []}
+
+        # ── 评分趋势面板（仅当 metrics.db 存在时） ──
+        metrics_path = self.project_root / ".novel.metrics.db"
+        if metrics_path.exists():
+            try:
+                ms = MetricsStore(metrics_path)
+                history = ms.get_evaluation_history()
+                if history:
+                    scores = [r.total_score for r in history]
+                    avg_score = sum(scores) / len(scores)
+                    latest_score = scores[-1]
+                    dashboard["critic"] = {
+                        "total": len(history),
+                        "avg_score": round(avg_score, 1),
+                        "latest_score": latest_score,
+                        "is_pass": latest_score >= 80 if history else None,
+                    }
+                else:
+                    dashboard["critic"] = {"total": 0}
+            except Exception:
+                dashboard["critic"] = {"total": 0, "error": "读取失败"}
+        else:
+            dashboard["critic"] = {"total": 0}
+
+        # ── 诊断摘要面板 ──
+        items = self.diagnose()
+        errors = sum(1 for i in items if i.level == DiagnosticLevel.ERROR)
+        warnings = sum(1 for i in items if i.level == DiagnosticLevel.WARNING)
+        info = sum(1 for i in items if i.level == DiagnosticLevel.INFO)
+        dashboard["diagnosis"] = {
+            "total": len(items),
+            "errors": errors,
+            "warnings": warnings,
+            "info": info,
+            "items": [
+                {"level": i.level.value, "category": i.category, "message": i.message}
+                for i in items
+            ],
+        }
+
+        return dashboard

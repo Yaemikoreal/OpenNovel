@@ -747,6 +747,63 @@ class CanonChecker:
         violations.sort(key=lambda v: severity_order.get(v.severity, 9))
         return violations
 
+    def _has_inline_exemption(self, text: str, rule_concept: str) -> bool:
+        """检测文本中是否包含行内豁免标记。
+
+        支持格式: <!-- canon_exempt: rule_concept -->
+        例如: "宝剑发出耀眼的光芒。<!-- canon_exempt: magic_no_glow -->"
+
+        Args:
+            text: 待检查的文本
+            rule_concept: 规则概念名称
+
+        Returns:
+            True 表示存在豁免标记
+        """
+        pattern = re.escape(rule_concept)
+        return bool(re.search(
+            rf"<!-- canon_exempt:\s*{pattern}\s*-->",
+            text,
+        ))
+
+    def check_text_with_exemptions(
+        self,
+        text: str,
+        rules: list[CanonRule],
+        chapter_exemptions: list[str] | None = None,
+    ) -> list[CanonViolation]:
+        """检查文本是否违反世界观规则（支持豁免标记）。
+
+        在标准 check_text 基础上增加两层豁免：
+        - A1: 行内豁免（Markdown 注释 `<!-- canon_exempt: concept -->`）
+        - A2: 章节 Frontmatter 声明的豁免列表
+
+        Args:
+            text: 待检查的文本
+            rules: 世界观规则列表
+            chapter_exemptions: 章节级豁免的规则概念列表（可选）
+
+        Returns:
+            过滤后的违反规则列表
+        """
+        violations = self.check_text(text, rules)
+        if not violations:
+            return []
+
+        # A1: 行内豁免
+        filtered = []
+        for v in violations:
+            if self._has_inline_exemption(text, v.rule):
+                continue
+            filtered.append(v)
+
+        # A2: 章节 Frontmatter 豁免
+        if chapter_exemptions:
+            exempt_set = {e.lower() for e in chapter_exemptions}
+            filtered = [v for v in filtered if v.rule.lower() not in exempt_set]
+
+        return filtered
+
 
 # ── 便捷函数 ─────────────────────────────────────────────────────────────
 

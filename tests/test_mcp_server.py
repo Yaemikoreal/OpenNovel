@@ -19,16 +19,21 @@ from opennovel.mcp_server import (
 class TestListTools:
     """list_tools 测试。"""
 
+    _EXPECTED_TOOLS = {
+        "init_project", "get_status", "write_chapter", "auto_create",
+        "commit", "stash", "diff", "doctor", "foreshadow",
+    }
+
     @pytest.mark.anyio
-    async def test_returns_four_tools(self):
+    async def test_returns_nine_tools(self):
         tools = await list_tools()
-        assert len(tools) == 4
+        assert len(tools) == 9
 
     @pytest.mark.anyio
     async def test_tool_names(self):
         tools = await list_tools()
         names = {t.name for t in tools}
-        assert names == {"init_project", "get_status", "write_chapter", "auto_create"}
+        assert names == self._EXPECTED_TOOLS
 
     @pytest.mark.anyio
     async def test_tools_have_schemas(self):

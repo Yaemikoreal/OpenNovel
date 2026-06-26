@@ -10,7 +10,12 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from opennovel.core.context_assembler import ContextStrategy, assemble_context
+from opennovel.core.context_assembler import (
+    ContextStrategy,
+    assemble_context,
+    detect_strategy,
+    get_model_window,
+)
 from opennovel.core.llm import LLMBus
 from opennovel.schemas.director import DirectorAnalysis
 from opennovel.schemas.foreshadowing import ForeshadowItem
@@ -311,7 +316,7 @@ foreshadowing_items（可选，伏笔检测结果列表）。
             project_root=self.project_root,
             task_message=task_message,
             prompt_path=self.prompt_path,
-            strategy=ContextStrategy.STANDARD,
+            strategy=detect_strategy(get_model_window(getattr(self.llm_bus, 'model', ''))),
         )
 
         last_error = None

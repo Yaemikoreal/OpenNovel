@@ -115,40 +115,60 @@ def commit(
     )
     console.print(diff_panel)
 
-    # Step 4: 人工守门（铁律 3）
-    rprint("\n[bold]Step 4/5[/bold] 人工审阅")
-    choice = typer.prompt("Apply these changes? [y/n/edit]", default="n")
+    # Step 4: 人工守门（铁律 3）— 逐事件确认
+    rprint("\n[bold]Step 4/5[/bold] 人工审阅（逐事件确认）")
+    confirmed_events = []
 
-    if choice.lower() == "n":
-        rprint("[yellow]已取消，状态未变更[/yellow]")
+    for i, evt in enumerate(events, 1):
+        # 展示事件摘要
+        rprint(
+            f"\n事件 [bold]{i}/{len(events)}[/bold]: "
+            f"[cyan]{evt.event_type}[/cyan] - {evt.description[:80]}"
+        )
+        rprint(f"  角色: {evt.character_id}  |  因果压强: {evt.causal_pressure}")
+
+        # 逐事件选择
+        choice = typer.prompt("  应用此事件? [y/n/detail]", default="y")
+
+        if choice.lower() == "detail":
+            if evt.caused_by:
+                rprint(f"  前置事件: {evt.caused_by}")
+            if evt.related_event_ids:
+                rprint(f"  关联事件: {evt.related_event_ids}")
+            choice = typer.prompt("  应用此事件? [y/n]", default="y")
+
+        if choice.lower() == "y":
+            confirmed_events.append(evt)
+            rprint("  [green]✓ 已确认[/green]")
+        else:
+            rprint("  [yellow]— 已跳过[/yellow]")
+
+    if not confirmed_events:
+        rprint("[yellow]未确认任何事件，状态未变更[/yellow]")
         return
 
-    if choice.lower() == "edit":
-        rprint("[dim]手动编辑功能开发中...[/dim]")
-        return
-
-    if choice.lower() != "y":
-        rprint("[yellow]已取消，状态未变更[/yellow]")
-        return
+    rprint(f"\n[bold]确认: {len(confirmed_events)}/{len(events)} 个事件将写入[/bold]")
 
     # Step 5: 写入固化
     rprint("\n[bold]Step 5/5[/bold] 写入固化...")
-    event_ids = auditor.apply_confirmed_events(events, chapter_id)
+    event_ids = auditor.apply_confirmed_events(confirmed_events, chapter_id)
 
     # 更新快照的 after 状态（只更新受影响的文件）
     manager.update_snapshot_after(snapshot.snapshot_id, affected_files, event_ids)
 
     rprint(f"[bold green]✓ 已固化 {len(event_ids)} 个事件[/bold green]")
 
-    # 生成章节摘要（复用 Auditor 的事件数据）
+    # 生成章节摘要（使用已确认的事件数据）
     try:
-        events_summary = "; ".join([f"({e.event_type}) {e.description[:60]}" for e in events[:5]])
+        events_summary = "; ".join(
+            [f"({e.event_type}) {e.description[:60]}" for e in confirmed_events[:5]]
+        )
         write_summary(
             project_root=project_root,
             chapter_id=chapter_id,
             chapter_title=chapter_meta.get("title", chapter_id),
             chapter_summary=f"章节 {chapter_id} 已人工审阅并固化。\n\n关键事件:\n{events_summary}",
-            key_events=[f"[{e.event_type}] {e.description}" for e in events[:10]],
+            key_events=[f"[{e.event_type}] {e.description}" for e in confirmed_events[:10]],
         )
         rprint(f"  [green]✓[/green] 摘要已生成: summaries/{chapter_id}.md")
     except Exception as e:

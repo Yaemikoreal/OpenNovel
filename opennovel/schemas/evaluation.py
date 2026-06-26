@@ -72,6 +72,8 @@ class ChapterEvaluation(BaseModel):
     issues: list[str]
     suggestions: list[str]
     anchored_issues: list[AnchoredIssue] = []
+    critique_reasoning: str = ""
+    """评分过程的推理依据。由 Glass-Box Decision 捕获。"""
 
     @field_validator("total_score")
     @classmethod

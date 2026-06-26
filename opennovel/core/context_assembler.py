@@ -19,10 +19,68 @@ from pathlib import Path
 import tiktoken
 
 from opennovel.core.parser import split_chapter_into_scenes
+from opennovel.core.state_projector import StateProjector
 from opennovel.schemas.character import AuthorityLevel
+from opennovel.storage.sqlite import EventStore
 from opennovel.storage.yaml_storage import YAMLStorage
 
 logger = logging.getLogger(__name__)
+
+
+# ── 模型窗口映射（用于 detect_strategy） ──
+
+# 常见模型的上下文窗口大小（Token 数）
+# 未列出的模型默认返回 128K（STANDARD 策略上限）
+_MODEL_WINDOWS: dict[str, int] = {
+    # DeepSeek 系列
+    "deepseek/deepseek-v4-flash": 800_000,
+    "deepseek/deepseek-chat": 64_000,
+    "deepseek/deepseek-r1": 100_000,
+    # OpenAI 系列
+    "gpt-4": 8_192,
+    "gpt-4-turbo": 128_000,
+    "gpt-4o": 128_000,
+    "gpt-4o-mini": 128_000,
+    # Anthropic 系列
+    "claude-3-opus": 200_000,
+    "claude-sonnet-4-6": 200_000,
+    "claude-opus-4-8": 200_000,
+    # Google 系列
+    "gemini/gemini-1.5-pro": 1_000_000,
+    "gemini/gemini-1.5-flash": 1_000_000,
+}
+
+_DEFAULT_WINDOW = 128_000  # 未知模型默认值（STANDARD 策略上限）
+
+
+def get_model_window(model_name: str) -> int:
+    """根据模型名称获取上下文窗口大小。
+
+    精确匹配优先，未命中时尝试前缀匹配（如 'deepseek/deepseek-chat' 匹配 'deepseek/*'），
+    仍未命中返回默认值 128K。
+
+    Args:
+        model_name: 模型名称（如 "deepseek/deepseek-v4-flash"）
+
+    Returns:
+        上下文窗口 Token 数
+    """
+    if not model_name:
+        return _DEFAULT_WINDOW
+
+    # 精确匹配
+    if model_name in _MODEL_WINDOWS:
+        return _MODEL_WINDOWS[model_name]
+
+    # 前缀匹配：取 provider 前缀的最长匹配
+    provider = model_name.split("/")[0] if "/" in model_name else model_name
+    provider_match = f"{provider}/"
+    for key in sorted(_MODEL_WINDOWS.keys(), reverse=True):
+        if key.startswith(provider_match):
+            return _MODEL_WINDOWS[key]
+
+    logger.debug("未知模型 %s，使用默认窗口 %d", model_name, _DEFAULT_WINDOW)
+    return _DEFAULT_WINDOW
 
 
 # ── 三级上下文策略 ──
@@ -518,6 +576,38 @@ def _assemble_standard(
         messages.append(msg)
         total_tokens += state_tokens
         state_used += state_tokens
+
+    # 3.5 状态投影快照 (STATE MEMORY) — 可选，使用剩余预算
+    _proj_chapter = chapter_path.stem if chapter_path else ""
+    if chars_to_load and _proj_chapter:
+        try:
+            db_path = project_root / ".novel.db"
+            if db_path.exists():
+                event_store = EventStore(db_path)
+                projector = StateProjector(event_store)
+                snapshots = []
+                for char_id in chars_to_load:
+                    snap = projector.project(char_id, _proj_chapter)
+                    if snap.event_count > 0:
+                        snapshots.append(snap)
+
+                if snapshots:
+                    proj_text = projector.format_snapshots(snapshots)
+                    proj_text = wrap_with_authority_tag(proj_text, AuthorityLevel.STATE_MEMORY)
+                    proj_tokens = counter.count(proj_text)
+                    remaining = state_budget - state_used
+                    if remaining > 0 and proj_tokens <= remaining:
+                        msg = ContextMessage(
+                            role="system",
+                            content=proj_text,
+                            authority=AuthorityLevel.STATE_MEMORY,
+                        )
+                        msg.token_count = proj_tokens
+                        messages.append(msg)
+                        total_tokens += proj_tokens
+                        state_used += proj_tokens
+        except Exception as e:
+            logger.debug("状态投影快照注入失败（非关键路径）: %s", e)
 
     # 4. 潜意识 (SUBCONSCIOUS) — 分配 15% 预算
     sub_budget = int(budget * 0.15)

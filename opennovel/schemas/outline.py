@@ -36,6 +36,8 @@ class ChapterOutline(BaseModel):
     key_plot_points: list[str]
     narrative_rhythm: str
     target_words: int
+    reasoning: str = ""
+    """生成本大纲的构思过程与依据。由 Glass-Box Decision 捕获，不参与校验。"""
 
     @field_validator("chapter_id")
     @classmethod

@@ -5,6 +5,7 @@
 - 提供合理的默认值（三层 fallback：novel.yaml > GlobalConfig > 硬编码）
 - 类型安全的配置访问
 - per-agent LLM 配置覆盖
+- 配置 Schema 校验（字段类型/范围/格式）
 
 三层模型路由（ADR 0006 — Agent 自治基础设施）：
     novel.yaml agents.writer.model → novel.yaml model → .opennovel.yaml default_model → 硬编码
@@ -23,11 +24,68 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
 
 from opennovel.core.global_config import DEFAULT_MODEL, GlobalConfig
 from opennovel.core.safety_fence import SafetyFenceConfig as _SafetyFenceConfig
 
 logger = logging.getLogger(__name__)
+
+
+# ── 配置 Schema 校验 ──
+
+
+class _NovelConfigSchema(BaseModel):
+    """novel.yaml 的 Pydantic 校验 Schema。
+
+    字段规则：
+    - version: 语义化版本号
+    - model: 非空模型名称
+    - token_budget / output_reserve: 合理的 Token 范围
+    - creative_direction: 可选，不超过 500 字
+    - target_chapters: 可选，1-1000
+    - words_per_chapter: 可选，100-50000
+    """
+
+    version: str = Field(default="1.0", pattern=r"^\d+\.\d+(\.\d+)?$")
+    model: str = Field(default="", min_length=0)  # 空值允许（使用 fallback）
+    token_budget: int | None = Field(default=None, ge=1000, le=1_000_000)
+    output_reserve: int | None = Field(default=None, ge=0, le=100_000)
+    api_base: str | None = None
+    api_key: str | None = None
+    creative_direction: str | None = Field(default=None, max_length=500)
+    target_chapters: int | None = Field(default=None, ge=1, le=1000)
+    words_per_chapter: int | None = Field(default=None, ge=100, le=50_000)
+    outline: str | None = None
+    director_enabled: bool | None = None
+    agents: dict[str, dict] = Field(default_factory=dict)
+
+
+class ConfigValidationError(Exception):
+    """配置校验失败时抛出的异常，携带精确的错误详情。
+
+    Attributes:
+        errors: Pydantic 校验错误列表，每项含字段路径、错误消息、错误类型
+        config_path: 配置文件路径（可选）
+    """
+
+    def __init__(
+        self,
+        errors: list[dict],
+        config_path: str | None = None,
+    ) -> None:
+        self.errors = errors
+        self.config_path = config_path
+        super().__init__(self._format_message())
+
+    def _format_message(self) -> str:
+        parts = []
+        if self.config_path:
+            parts.append(f"配置文件 {self.config_path} 校验失败:")
+        for err in self.errors:
+            loc = " → ".join(str(x) for x in err["loc"])
+            parts.append(f"  - [{loc}] {err['msg']} ({err['type']})")
+        return "\n".join(parts)
 
 # 默认配置值
 DEFAULT_TOKEN_BUDGET = 8000
@@ -51,6 +109,7 @@ class AgentConfig:
     api_key: str | None = None
     think_model: str | None = None
     write_model: str | None = None
+    write_model_climax: str | None = None
     revise_model: str | None = None
 
 
@@ -167,6 +226,22 @@ class LoomConfig:
         except Exception as e:
             logger.warning("配置文件读取失败，使用默认配置: %s", e)
             return cls(model=global_cfg.default_model)
+
+        # Schema 校验：在解析前验证字段类型和范围
+        try:
+            validated = _NovelConfigSchema(**data)
+        except PydanticValidationError as e:
+            errors = []
+            for err in e.errors():
+                errors.append({
+                    "loc": err["loc"],
+                    "msg": err["msg"],
+                    "type": err["type"],
+                })
+            raise ConfigValidationError(
+                errors=errors,
+                config_path=str(config_path),
+            ) from e
 
         # 解析 per-agent 配置
         agents_data = data.get("agents", {})
@@ -298,5 +373,6 @@ def _parse_agent_config(data: dict) -> AgentConfig:
         api_key=data.get("api_key"),
         think_model=data.get("think_model"),
         write_model=data.get("write_model"),
+        write_model_climax=data.get("write_model_climax"),
         revise_model=data.get("revise_model"),
     )

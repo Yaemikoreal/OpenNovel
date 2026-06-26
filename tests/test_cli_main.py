@@ -54,11 +54,17 @@ class TestInitCommand:
 
     def test_init_default_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """测试默认路径（当前目录）。"""
-        monkeypatch.chdir(tmp_path)
-        result = runner.invoke(app, ["init"])
+        from opennovel.core.global_config import GlobalConfig
 
-        assert result.exit_code == 0
-        assert (tmp_path / "canon").is_dir()
+        monkeypatch.chdir(tmp_path)
+        # 交互式模式：提供项目名称、模板、模式
+        result = runner.invoke(app, ["init"], input="test_novel\nstandard\nquick\n")
+
+        assert result.exit_code == 0, f"exit_code={result.exit_code}, output={result.output[:200]}"
+        # 交互式模式下项目创建在 workspace 目录
+        ws_dir = GlobalConfig.load().workspace_dir
+        project_dir = ws_dir / "test_novel"
+        assert (project_dir / "canon").is_dir(), f"Project not found at {project_dir}"
 
 
 class TestDiffCommand:

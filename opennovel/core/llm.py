@@ -11,6 +11,7 @@
 import json
 import logging
 from collections.abc import AsyncIterator
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,10 @@ from tenacity import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Glass-Box Decision: 跨模块隐式关联的追踪标识
+# AutoRunner.run_chapter() 入口设置，_log_prompt 中读取
+trace_id_var: ContextVar[str] = ContextVar("trace_id", default="")
 
 # LiteLLM 可重试的异常类型（仅网络/限流/超时类异常）
 RETRYABLE_EXCEPTIONS = (
@@ -247,8 +252,50 @@ class LLMBus:
                 json.dumps(log_data, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+
+            # Glass-Box Decision: 从 JSON 响应中提取 reasoning 并独立存储
+            if response_text:
+                self._extract_and_save_reasoning(response_text)
         except Exception as e:
             logger.debug("Prompt 日志写入失败: %s", e)
+
+    def _extract_and_save_reasoning(self, response_text: str) -> None:
+        """从 LLM 响应中提取 reasoning 字段并存入独立文件。
+
+        仅对 JSON 格式的响应（Think/Evaluate 阶段）有效。
+        Write 阶段的纯文本响应直接跳过。
+        文件保存到 prompt_log_dir 的上级目录下的 reasoning/ 子目录。
+        """
+        trace_id = trace_id_var.get()
+        if not trace_id or not self.prompt_log_dir:
+            return
+
+        reasoning = None
+        try:
+            data = json.loads(response_text)
+            reasoning = data.get("reasoning") or data.get("critique_reasoning")
+        except (json.JSONDecodeError, TypeError):
+            return  # 非 JSON 响应（如 Write 阶段），跳过
+
+        if not reasoning:
+            return
+
+        try:
+            reasoning_dir = self.prompt_log_dir.parent / "reasoning"
+            reasoning_dir.mkdir(parents=True, exist_ok=True)
+            path = reasoning_dir / f"{trace_id}_{self.agent_name or 'unknown'}.json"
+            log_data = {
+                "trace_id": trace_id,
+                "agent": self.agent_name,
+                "timestamp": datetime.now().isoformat(),
+                "reasoning": reasoning,
+            }
+            path.write_text(
+                json.dumps(log_data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            logger.debug("推理链日志写入失败: %s", e)
 
     def _record_usage(
         self, response: Any, model: str, chapter_id: str = ""

@@ -50,39 +50,115 @@ def init(
         None,
         help="项目名称（不指定时交互式输入）。传入 . 则在当前目录创建（不使用 workspace）",
     ),
+    template: str = typer.Option(
+        "standard",
+        help="项目模板: standard（标准）/ minimal（最小）",
+    ),
 ) -> None:
     """初始化小说项目目录，生成标准 ID 模板。
 
-    如果提供项目名称，在 workspace 目录下创建（如 novels/my-story/）。
-    如果传入 ".", 在当前目录创建（传统模式）。
+    交互式模式（不提供名称时）：
+    - 自动检测 API Key 环境
+    - 可选择"快速开始"自动完成，或"专家模式"精细配置
+
+    非交互式模式（提供名称时）：
+    - 在 workspace 目录下创建项目（传入 . 则在当前目录创建）
+    - 直接使用默认配置
     """
     from pathlib import Path
+
+    import yaml
+    import click
 
     from opennovel.core.global_config import GlobalConfig
     from opennovel.storage.yaml_storage import YAMLStorage
 
-    # 确定项目根目录
-    if name == "." or name is None and Path.cwd() == GlobalConfig._find_project_root():
-        # 传统模式：在当前目录创建
-        project_root = Path.cwd().resolve()
-    elif name is None:
-        # 交互式（TODO: 简化处理，使用默认名）
-        project_root = Path.cwd().resolve()
-        rprint("[yellow]提示: 使用 'novel init <项目名>' 在 workspace 下创建项目[/yellow]")
-    else:
-        # workspace 模式
-        global_cfg = GlobalConfig.load()
+    # ── 确定参数：name / template / mode ──
+    import os
+
+    has_deepseek = bool(os.environ.get("DEEPSEEK_API_KEY"))
+    has_openai = bool(os.environ.get("OPENAI_API_KEY"))
+    has_any_key = has_deepseek or has_openai
+    global_cfg = GlobalConfig.load()
+
+    effective_model: str = global_cfg.default_model
+    effective_template: str = template
+    is_interactive = name is None
+    project_root: Path
+
+    if is_interactive:
+        # ── 交互式模式 ──
+        rprint("[bold cyan]📚 OpenNovel 项目创建向导[/bold cyan]\n")
+
+        prompt_name = typer.prompt("项目名称", default="my_story")
+        safe_name = "".join(c for c in prompt_name if c.isalnum() or c in ("_", "-")).strip()
+        if not safe_name:
+            safe_name = "my_story"
+
+        effective_template = typer.prompt(
+            "项目模板", default="standard",
+            type=click.Choice(["standard", "minimal"]),
+        )
+
+        if not has_any_key:
+            rprint("\n[yellow]⚠ 未检测到 API Key[/yellow]")
+            rprint("  创作功能需要 LLM API 支持。请设置以下环境变量之一：")
+            rprint("    DEEPSEEK_API_KEY — DeepSeek API")
+            rprint("    OPENAI_API_KEY  — OpenAI API")
+            rprint("  或在项目创建后编辑 novel.yaml 中的 api_key / api_base 字段\n")
+
+        mode = typer.prompt(
+            "模式选择", default="quick",
+            type=click.Choice(["quick", "expert"]),
+        )
+
+        if mode == "expert":
+            custom_model = typer.prompt("模型名称", default=global_cfg.default_model)
+            if custom_model.strip():
+                effective_model = custom_model.strip()
+
+        # 交互式模式：项目创建在 workspace 目录下
         ws_dir = global_cfg.workspace_dir
         ws_dir.mkdir(parents=True, exist_ok=True)
-        project_root = (ws_dir / name).resolve()
-        rprint(f"[dim]工作区: {ws_dir}[/dim]")
+        project_root = (ws_dir / safe_name).resolve()
+        rprint(f"\n[dim]工作区: {ws_dir}[/dim]")
+        rprint(f"[dim]项目路径: {project_root}[/dim]\n")
 
-    if project_root.exists() and (project_root / "novel.yaml").exists():
-        rprint(f"[yellow]⚠ 项目已存在: {project_root}[/yellow]")
-        return
+    else:
+        # ── 非交互式模式 ──
+        name_path = Path(name).resolve()
+        if name == ".":
+            project_root = Path.cwd().resolve()
+        elif name_path.exists() or "/" in name or "\\" in name:
+            # 传入的是路径（绝对路径或包含分隔符的路径）
+            project_root = name_path
+        elif Path.cwd() == GlobalConfig._find_project_root():
+            # 当前在 workspace 根目录，直接在当前目录创建
+            project_root = Path.cwd().resolve() / name
+        else:
+            ws_dir = global_cfg.workspace_dir
+            ws_dir.mkdir(parents=True, exist_ok=True)
+            project_root = (ws_dir / name).resolve()
+            rprint(f"[dim]工作区: {ws_dir}[/dim]")
 
-    project_root.mkdir(parents=True, exist_ok=True)
-    rprint(f"[bold cyan]OpenNovel[/bold cyan] 正在初始化项目: [bold]{project_root}[/bold]")
+        rprint(f"[bold cyan]OpenNovel[/bold cyan] 正在初始化项目: [bold]{project_root}[/bold]")
+
+    # ── 创建标准目录结构 ──
+    directories = [
+        "canon",
+        "characters",
+        "draft",
+        "outlines",
+        "subconscious",
+        "foreshadowing",
+        "summaries",
+        "timeline",
+        ".snapshots",
+    ]
+    for dir_name in directories:
+        dir_path = project_root / dir_name
+        dir_path.mkdir(parents=True, exist_ok=True)
+        rprint(f"  [green]✓[/green] 创建目录: {dir_name}/")
     storage = YAMLStorage()
 
     # 创建标准目录结构
@@ -152,15 +228,10 @@ def init(
         )
         rprint("  [green]✓[/green] 创建章节模板: draft/ch_001.md")
 
-    # 生成 novel.yaml 配置（使用全局默认模型）
-    import yaml
-
-    from opennovel.core.global_config import GlobalConfig
-
-    global_cfg = GlobalConfig.load()
+    # 生成 novel.yaml 配置
     config = {
         "version": "1.0.1",
-        "model": global_cfg.default_model,
+        "model": effective_model,
         "token_budget": 8000,
         "output_reserve": 2000,
     }
@@ -170,8 +241,16 @@ def init(
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
         rprint(f"  [green]✓[/green] 创建配置文件: novel.yaml (model: {global_cfg.default_model})")
 
-    rprint("[bold green]项目初始化完成！[/bold green]")
-    rprint("使用 [bold]novel write[/bold] 开始创作，[bold]novel commit[/bold] 提取状态。")
+    rprint(f"[bold green]✅ 项目初始化完成！[/bold green]")
+    rprint(f"  项目路径: {project_root}")
+    rprint(f"  默认模型: {effective_model}")
+    if not has_any_key and name is None:
+        rprint("  [yellow]⚠ API Key 未配置，请设置环境变量或编辑 novel.yaml[/yellow]")
+    rprint("")
+    rprint("  [bold]下一步:[/bold]")
+    rprint("    novel write ch_001   开始创作第一章")
+    rprint("    novel commit ch_001  提取状态并固化")
+    rprint("    novel auto           四 Agent 全自动创作")
 
 
 @app.command()
@@ -391,28 +470,22 @@ def diff(
     rprint(f"\n[dim]共 {warnings} 个 WARNING, {infos} 个 INFO[/dim]")
 
 
-@app.command()
-def doctor(
-    path: str = typer.Argument(".", help="项目路径"),
-) -> None:
-    """诊断世界线健康度（基础检测：孤立角色、悬空引用、ID 一致性、脏标记）。"""
-    from pathlib import Path
+def _render_diagnostic_table(items: list) -> None:
+    """渲染诊断结果表格。
 
+    Args:
+        items: DiagnosticItem 对象列表，或包含 level/category/message 的 dict 列表
+    """
     from rich.table import Table
 
-    from opennovel.core.doctor import DiagnosticLevel, Doctor
+    from opennovel.core.doctor import DiagnosticLevel
 
-    project_root = Path(path).resolve()
-    rprint("[bold cyan]OpenNovel doctor[/bold cyan] - 世界线诊断\n")
+    def _get(obj, attr, default="-"):
+        """兼容 DiagnosticItem 对象和 dict 的属性访问。"""
+        if isinstance(obj, dict):
+            return obj.get(attr, default)
+        return getattr(obj, attr, default)
 
-    doc = Doctor(project_root)
-    items = doc.diagnose()
-
-    if not items:
-        rprint("[bold green]✓ 项目健康，未检测到问题[/bold green]")
-        return
-
-    # 渲染结果表格
     table = Table(title=f"诊断完成，共 {len(items)} 项")
     table.add_column("级别", style="bold", width=10)
     table.add_column("类别", width=18)
@@ -420,27 +493,157 @@ def doctor(
     table.add_column("详情", style="dim")
 
     for item in items:
+        level = _get(item, "level", "INFO")
+        if isinstance(level, DiagnosticLevel):
+            level = level.value
         level_style = {
-            DiagnosticLevel.ERROR: "red",
-            DiagnosticLevel.WARNING: "yellow",
-            DiagnosticLevel.OK: "green",
-            DiagnosticLevel.INFO: "cyan",
-        }.get(item.level, "white")
+            "ERROR": "red",
+            "WARNING": "yellow",
+            "OK": "green",
+            "INFO": "cyan",
+        }.get(level, "white")
 
         table.add_row(
-            f"[{level_style}]{item.level.value}[/{level_style}]",
-            item.category,
-            item.message,
-            item.details,
+            f"[{level_style}]{level}[/{level_style}]",
+            _get(item, "category", "-"),
+            _get(item, "message", "-"),
+            _get(item, "details", ""),
         )
 
     console.print(table)
 
-    # 汇总
-    errors = sum(1 for i in items if i.level == DiagnosticLevel.ERROR)
-    warnings = sum(1 for i in items if i.level == DiagnosticLevel.WARNING)
-    oks = sum(1 for i in items if i.level in (DiagnosticLevel.OK, DiagnosticLevel.INFO))
+    # 统计
+    errors = sum(1 for i in items if _get(i, "level") in ("ERROR", DiagnosticLevel.ERROR))
+    warnings = sum(1 for i in items if _get(i, "level") in ("WARNING", DiagnosticLevel.WARNING))
+    oks = sum(
+        1
+        for i in items
+        if _get(i, "level") in ("OK", "INFO", DiagnosticLevel.OK, DiagnosticLevel.INFO)
+    )
     rprint(f"\n[dim]共 {errors} 个 ERROR, {warnings} 个 WARNING, {oks} 个 OK/INFO[/dim]")
+
+
+@app.command()
+def doctor(
+    path: str = typer.Argument(".", help="项目路径"),
+    dashboard: bool = typer.Option(True, "--dashboard/--no-dashboard", help="显示健康面板"),
+    calibration: bool = typer.Option(False, "--calibration", help="Critic 评分校准分析"),
+) -> None:
+    """诊断世界线健康度：显示项目健康面板 + 详细诊断。
+
+    默认显示项目健康面板（配置、章节进度、角色、事件、评分趋势），
+    随后列出详细的诊断问题（孤立角色、悬空引用、ID 一致性、脏标记）。
+
+    使用 --calibration 运行 Critic 评分校准分析。
+    """
+    from pathlib import Path
+
+    from rich.panel import Panel
+
+    from opennovel.core.doctor import DiagnosticLevel, Doctor
+
+    project_root = Path(path).resolve()
+
+    # ── 校准模式 ──
+    if calibration:
+        from opennovel.core.evaluation_auditor import EvaluationAuditor
+
+        auditor = EvaluationAuditor.from_project(project_root)
+        if not auditor:
+            rprint("[yellow]无评分数据（.novel.metrics.db 不存在或为空）[/yellow]")
+            rprint("运行 novel auto 生成评分数据后再次检查。")
+            return
+        report = auditor.analyze()
+        rprint(f"[bold cyan]OpenNovel 评分校准[/bold cyan] - {project_root.name}\n")
+        rprint(auditor.format_report(report))
+        return
+
+    rprint(f"[bold cyan]OpenNovel doctor[/bold cyan] - {project_root.name}\n")
+
+    doc = Doctor(project_root)
+
+    if not dashboard:
+        # 传统诊断模式
+        items = doc.diagnose()
+        if not items:
+            rprint("[bold green]✓ 项目健康，未检测到问题[/bold green]")
+            return
+        _render_diagnostic_table(items)
+        return
+
+    # 面板模式
+    data = doc.generate_dashboard()
+
+    # ── 配置面板 ──
+    cfg = data.get("config", {})
+    cfg_lines = []
+    if cfg.get("status") == "error":
+        cfg_lines.append(f"[red]✗ 配置读取失败: {cfg.get('error', '未知错误')}[/red]")
+    else:
+        model_str = cfg.get("model", "未配置")
+        budget = cfg.get("token_budget", "?")
+        version = cfg.get("version", "?")
+        api_status = "✅ 已配置" if cfg.get("has_api_key") else "⚠ 未配置"
+        direction = cfg.get("creative_direction", "") or "(未设置)"
+        cfg_lines.append(f"模型: {model_str}  |  Token 预算: {budget}")
+        cfg_lines.append(f"版本: {version}  |  API Key: {api_status}")
+        cfg_lines.append(f"方向: {direction}")
+    console.print(Panel("\n".join(cfg_lines), title="📋 配置", border_style="blue"))
+
+    # ── 进度面板 ──
+    prog = data.get("progress", {})
+    ch_count = prog.get("chapters", 0)
+    latest = prog.get("latest", "-")
+    prog_text = f"已完成: {ch_count} 章  |  最新章节: {latest}"
+    console.print(Panel(prog_text, title="📝 章节进度", border_style="green"))
+
+    # ── 角色与事件面板 ──
+    chars = data.get("characters", {})
+    events = data.get("events", {})
+    char_evt_text = (
+        f"活跃角色: {chars.get('total', 0)}  |  "
+        f"已记录事件: {events.get('total', 0)}"
+    )
+    if events.get("types"):
+        char_evt_text += f"\n事件类型: {', '.join(events['types'][:6])}"
+    console.print(Panel(char_evt_text, title="👤 角色 & 📋 事件", border_style="cyan"))
+
+    # ── 评分趋势面板 ──
+    critic = data.get("critic", {})
+    if critic.get("total", 0) > 0:
+        avg = critic.get("avg_score", "?")
+        latest_s = critic.get("latest_score", "?")
+        passed = critic.get("is_pass")
+        pass_str = "✅ 合格" if passed else "⚠ 需改进"
+        crit_text = f"总评分次数: {critic['total']} | 平均分: {avg} | 最新: {latest_s} ({pass_str})"
+    else:
+        crit_text = "暂无评分数据（运行 novel auto 后生成）"
+    console.print(Panel(crit_text, title="📊 评分趋势", border_style="magenta"))
+
+    # ── 诊断摘要面板 ──
+    diag = data.get("diagnosis", {})
+    err_count = diag.get("errors", 0)
+    warn_count = diag.get("warnings", 0)
+    info_count = diag.get("info", 0)
+    diag_summary = f"ERROR: {err_count}  |  WARNING: {warn_count}  |  INFO: {info_count}"
+
+    if err_count > 0:
+        diag_summary = f"[red]{diag_summary}[/red]"
+    elif warn_count > 0:
+        diag_summary = f"[yellow]{diag_summary}[/yellow]"
+    else:
+        diag_summary = f"[green]{diag_summary}[/green]"
+
+    console.print(Panel(diag_summary, title="🔍 诊断摘要", border_style="yellow"))
+
+    # ── 详细诊断列表 ──
+    items = diag.get("items", [])
+    if items:
+        console.print()
+        _render_diagnostic_table(items)
+    elif cfg.get("status") != "error":
+        console.print()
+        rprint("[bold green]✓ 未检测到结构性问题[/bold green]")
 
 
 @app.command()
