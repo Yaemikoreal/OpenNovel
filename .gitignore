@@ -29,6 +29,7 @@ env/
 
 # Loom specific
 .novel.db
+.novel.fts5.db
 .index/
 .snapshots/
 *.snapshot.json
@@ -72,7 +73,6 @@ test_novel/
 # Internal design docs (not for public repo)
 设计文档/
 CLAUDE.md
-CONTEXT.md
 
 # Test artifacts (generated during test runs)
 /canon/
