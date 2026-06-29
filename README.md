@@ -289,6 +289,7 @@ novel <command> --help  # Command-specific help
 | `novel rollback <snapshot>` | Restore project to a previous snapshot. |
 | `novel diff <file>` | Validate consistency between chapter text and shadow state. |
 | `novel doctor <path>` | Diagnose project health: orphan characters, dangling references, dirty flags. |
+| `novel reindex <path>` | Rebuild search indexes (FTS5 + vector). |
 | `novel list` | List all projects in workspace with model, chapter count, word count. |
 | `novel config` | View or modify global configuration (default model, workspace directory). |
 | `novel foreshadow` | View or manage foreshadowing tracking table. `--add` for manual entries.
@@ -395,13 +396,21 @@ Agent-level (agents.writer.model)
 ```
 opennovel/
 ├── cli/                  # Typer CLI commands
-├── core/                 # Core engine
+│   ├── main.py           # Root commands (init/rollback/diff/doctor/list/config)
+│   ├── write.py          # Interactive writing (Gen1)
+│   ├── auto.py           # Autonomous pipeline (Gen2)
+│   ├── commit.py         # Five-step review workflow
+│   ├── stash.py          # Inspiration management
+│   └── reindex.py        # Search index rebuild (FTS5 + vector)
 │   ├── llm.py            # LiteLLM bus + tenacity retry + token tracking
 │   ├── auto_runner.py    # Autonomous four-agent orchestrator
 │   ├── context_assembler.py  # Context assembly + token budgeting
 │   ├── agent_autonomy.py # Tool-calling protocol + autonomous loop
 │   ├── hybrid_retriever.py  # SQL + vector dual-track retrieval
 │   ├── retriever.py      # Semantic retrieval routing
+│   ├── chunker.py        # Recursive Markdown chunker (H1→H2→para)
+│   ├── reranker.py       # Cross-Encoder re-ranker (bge-reranker-v2-m3)
+│   ├── search_pipeline.py # Three-channel search + RRF + reranker
 │   ├── causal_graph.py   # NetworkX causal DAG analysis
 │   ├── canon_checker.py  # World-building rule validation
 │   ├── safety_fence.py   # Recursion/token/timeout/canon constraints
@@ -426,7 +435,8 @@ opennovel/
 │   ├── timeline.py       # Timeline generator (SQL to Markdown)
 │   ├── summaries.py      # Chapter summary persistence
 │   ├── yaml_storage.py   # YAML frontmatter atomic read/write
-│   └── vector.py         # LlamaIndex vector index
+│   ├── vector.py         # LlamaIndex vector index
+│   └── fts5.py           # SQLite FTS5 full-text search index
 ├── schemas/              # Pydantic / SQLModel models
 ├── prompts/              # Agent prompt assets
 └── mcp_server.py         # MCP protocol server
@@ -463,7 +473,7 @@ mypy --strict opennovel/
 
 ### Test Status
 
-- **850+ tests** across 40 test files
+- **850+ tests** across 41 test files
 - **88% code coverage**
 - Modules at or near 100% coverage: parser, state_manager, diff_checker, doctor, schemas, yaml_storage, metrics, foreshadowing
 

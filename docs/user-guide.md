@@ -324,6 +324,30 @@ novel doctor
 - 事件账本完整性
 - 快照统计
 
+### `novel reindex [路径]`
+
+重建搜索索引（FTS5 全文索引 + 向量索引）。
+
+```bash
+novel reindex                        # 重建当前项目索引
+novel reindex novels/my_novel        # 重建指定项目索引
+```
+
+适用于：
+- FTS5 或向量索引损坏时修复
+- 手动修改了 canon/ 或 characters/ 文件后同步索引
+- 首次使用搜索功能前初始化索引
+
+### `novel auto <路径>`
+
+四 Agent 全自动创作流水线（推荐的长篇创作方式）。
+
+```bash
+novel auto novels/my_novel
+```
+
+系统自动执行 Writer→Critic→Manager→Director 循环，逐章生成完整小说。详见[全自动写作](#全自动写作)章节。
+
 ---
 
 ## 写作工作流
@@ -364,6 +388,78 @@ output_reserve: 2000      # 输出预留
 ```
 
 你可以修改 `model` 来切换默认模型，支持 LiteLLM 的所有模型标识。
+
+---
+
+## 全自动写作（Gen2）
+
+`novel auto` 是 OpenNovel Gen2 的核心特性。当你准备好了世界观设定、角色档案和大纲后，一条命令即可自动生成完整小说。
+
+### 适用场景
+
+- **长篇小说创作**：从大纲出发，逐章生成完整故事
+- **快速原型**：测试不同故事方向的可行性
+- **辅助创作**：先生成草稿，再人工精修
+
+### 准备工作
+
+1. 完成 `canon/world_rules.md`（世界观设定）
+2. 创建角色档案（`characters/`）
+3. 编写大纲（`outlines/story.md`，## 分隔各章）
+4. 配置 `novel.yaml` 中的创作参数
+
+```bash
+# 启动全自动创作
+novel auto novels/my_novel
+```
+
+### 流水线
+
+```
+每章循环:
+  1. Writer.think()        → 结构化大纲（场景拆分）
+  2. Writer.write()        → 创作正文
+  3. Critic.evaluate()     → 五维评分（<80 分退回修订）
+  4. Writer.revise()       → 锚定反馈修订
+  5. Manager.update()      → 角色状态 + 事件记录
+  6. Director.analyze()    → 全局策略注入下一章（可选）
+```
+
+### 创作配置
+
+```yaml
+# novel.yaml
+creative_direction: "黑暗奇幻，克苏鲁元素"  # 创作方向
+target_chapters: 10                   # 目标章节数
+words_per_chapter: 3000               # 每章目标字数
+director_enabled: true                # 启用 Director 分析
+```
+
+---
+
+## 搜索系统
+
+OpenNovel 内置三通道混合搜索系统，用于 Agent 创作过程中的知识召回。
+
+### 搜索通道
+
+| 通道 | 功能 | 存储 |
+|:---|:---|:---|
+| FTS5 全文索引 | 精确关键词匹配 | `.novel.fts5.db` |
+| 向量语义检索 | 语义相似度搜索 | `.index/` |
+| Cross-Encoder 重排序 | 精排融合结果 | 运行时 |
+
+三通道结果通过 RRF（Reciprocal Rank Fusion）算法融合排序。
+
+### 管理索引
+
+```bash
+# 重建全部索引（索引损坏或文件修改后执行）
+novel reindex
+
+# 重建指定项目索引
+novel reindex novels/my_novel
+```
 
 ---
 

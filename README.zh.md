@@ -282,6 +282,7 @@ novel <command> --help   # 查看具体命令帮助
 | `novel rollback <snapshot>` | 回滚到指定快照。 |
 | `novel diff <file>` | 校验章节正文与 Shadow 状态的一致性。 |
 | `novel doctor <path>` | 诊断项目健康度：孤立角色、悬空引用、脏标记。 |
+| `novel reindex <path>` | 重建搜索索引（FTS5 + 向量）。 |
 | `novel list` | 列出工作区所有项目（模型、章节数、字数）。 |
 | `novel config` | 查看或修改全局配置（默认模型、工作区路径）。 |
 | `novel foreshadow` | 查看伏笔追踪表。`--add` 手动补充伏笔。 |
@@ -305,6 +306,11 @@ target_chapters: 5
 words_per_chapter: 3500
 outline: "outlines/story.md"
 director_enabled: true
+
+# 搜索配置（ADR 0007 混合语义-关键词检索 + 重排序，可选）
+reranker_enabled: true
+reranker_model: "BAAI/bge-reranker-v2-m3"
+search_top_k: 5
 
 agents:
   writer:
@@ -388,6 +394,9 @@ opennovel/
 │   ├── agent_autonomy.py # 工具调用协议 + 自治循环
 │   ├── hybrid_retriever.py  # SQL + 向量双轨检索
 │   ├── retriever.py      # 语义检索路由
+│   ├── chunker.py        # 递归 Markdown 分块（H1→H2→段落）
+│   ├── reranker.py       # Cross-Encoder 重排序（bge-reranker-v2-m3）
+│   ├── search_pipeline.py # 三通道搜索 + RRF + Reranker
 │   ├── causal_graph.py   # NetworkX 因果 DAG 分析
 │   ├── canon_checker.py  # 世界观规则校验
 │   ├── safety_fence.py   # 递归/Token/超时/Canon 约束
@@ -412,7 +421,8 @@ opennovel/
 │   ├── timeline.py       # 时间线生成器（SQL → Markdown）
 │   ├── summaries.py      # 章节摘要持久化
 │   ├── yaml_storage.py   # YAML Frontmatter 原子读写
-│   └── vector.py         # LlamaIndex 向量索引
+│   ├── vector.py         # LlamaIndex 向量索引
+│   └── fts5.py           # SQLite FTS5 全文索引
 ├── schemas/              # Pydantic / SQLModel 数据模型
 ├── prompts/              # Agent Prompt 资产
 └── mcp_server.py         # MCP 协议服务器
@@ -446,7 +456,7 @@ mypy opennovel/
 
 ### 测试状态
 
-- **850+ 项测试**，覆盖 40 个测试文件
+- **850+ 项测试**，覆盖 41 个测试文件
 - **88% 代码覆盖率**
 - 核心模块覆盖率接近或达到 100%
 
