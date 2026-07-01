@@ -90,7 +90,7 @@ jobs:
           pytest --cov=loom --cov-report=xml --cov-report=term-missing -v
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           file: ./coverage.xml
           fail_ci_if_error: false
